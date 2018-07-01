@@ -10,6 +10,8 @@ import Data.Char
 
 type Stack = [Int]
 type Registers = Map Int Int
+newtype Register = Register Int
+newtype InsCode = InsCode Int
 
 (|>) x f = f x
 
@@ -47,17 +49,17 @@ next registers stack =
 		[] ->
 			return ()
 		(x:xs) ->
-			runInstruction registers x xs
+			runInstruction registers (InsCode x) xs
 
 
-runInstruction :: Registers -> Int -> Stack -> IO ()
+runInstruction :: Registers -> InsCode -> Stack -> IO ()
 runInstruction registers code stack =
 	case code of
-		4 ->
+		InsCode 4 ->
 			doEq registers stack
-		9 ->
+		InsCode 9 ->
 			doAdd registers stack
-		19 ->
+		InsCode 19 ->
 			doWriteAscii registers stack
 		_ ->
 			print registers
@@ -80,14 +82,23 @@ numToRegister n =
 		Nothing
 
 
+withRegister :: Int -> Registers -> Maybe (Register, Int)
+withRegister n reg =
+	case numToRegister n of
+		Just regNum ->
+			Just (Register regNum, getValue reg regNum)
+
+		Nothing ->
+			Nothing
+
 -- eq: 4 a b c
 -- set <a> to 1 if <b> is equal to <c>; set it to 0 otherwise
 doEq :: Registers -> Stack -> IO ()
 doEq reg stack =
 	case stack of
 		(a:b:c:rest) ->
-			case numToRegister a of
-				Just regNum ->
+			case withRegister a reg of
+				Just (Register regNum, value) ->
 					let
 						value =
 							if getValue reg b == getValue reg c then
@@ -101,6 +112,7 @@ doEq reg stack =
 								reg
 					in
 						next newReg rest
+
 				Nothing ->
 					return ()
 		_ ->
@@ -112,19 +124,18 @@ doAdd :: Registers -> Stack -> IO ()
 doAdd reg stack =
 	case stack of
 		(a:b:c:rest) ->
-			case numToRegister a of
-				Just rn ->
+			case withRegister a reg of
+				Just (Register regNum, value) ->
 					let
 						newReg =
 							Data.Map.insert
-								rn
+								regNum
 								(mod (b + c) 32768)
 								reg
 					in
 						next
 							newReg
 							rest
-						-- putStrLn "Running add"
 				Nothing ->
 					return ()
 
