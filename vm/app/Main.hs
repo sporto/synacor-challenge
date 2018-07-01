@@ -6,12 +6,17 @@ import Data.String.Utils
 import Text.Read
 import Data.Maybe
 import Data.Char
--- import Debug.Trace
+
+newtype Register = Register Int
+newtype Code = Code Int
+
+newtype Value = Value Int deriving Eq, Show
+
+unwrapValue (Value v) =
+	v
 
 type Stack = [Int]
-type Registers = Map Int Int
-newtype Register = Register Int
-newtype InsCode = InsCode Int
+type Registers = Map Int Value
 
 (|>) x f = f x
 
@@ -49,29 +54,32 @@ next registers stack =
 		[] ->
 			return ()
 		(x:xs) ->
-			runInstruction registers (InsCode x) xs
+			runInstruction registers (Code x) xs
 
 
-runInstruction :: Registers -> InsCode -> Stack -> IO ()
+runInstruction :: Registers -> Code -> Stack -> IO ()
 runInstruction registers code stack =
 	case code of
-		InsCode 4 ->
+		Code 0 ->
+			return ()
+		Code 1 ->
+			doSet registers stack
+		Code 4 ->
 			doEq registers stack
-		InsCode 9 ->
+		Code 9 ->
 			doAdd registers stack
-		InsCode 19 ->
+		Code 19 ->
 			doWriteAscii registers stack
 		_ ->
 			print registers
-			-- return ()
 
 
-getValue :: Registers -> Int -> Int
+getValue :: Registers -> Int -> Value
 getValue reg n =
 	(numToRegister n
 		>>= (\r -> Data.Map.lookup r reg)
 		)
-		|> fromMaybe n
+		|> fromMaybe (Value n)
 
 
 numToRegister :: Int -> Maybe Int
@@ -82,7 +90,7 @@ numToRegister n =
 		Nothing
 
 
-withRegister :: Int -> Registers -> Maybe (Register, Int)
+withRegister :: Int -> Registers -> Maybe (Register, Value)
 withRegister n reg =
 	case numToRegister n of
 		Just regNum ->
@@ -91,6 +99,13 @@ withRegister n reg =
 		Nothing ->
 			Nothing
 
+
+-- set: 1 a b
+-- set register <a> to the value of <b>
+doSet :: Registers -> Stack -> IO ()
+doSet reg stack =
+	return ()
+
 -- eq: 4 a b c
 -- set <a> to 1 if <b> is equal to <c>; set it to 0 otherwise
 doEq :: Registers -> Stack -> IO ()
@@ -98,17 +113,17 @@ doEq reg stack =
 	case stack of
 		(a:b:c:rest) ->
 			case withRegister a reg of
-				Just (Register regNum, value) ->
+				Just (Register regNum, _) ->
 					let
-						value =
+						newValue =
 							if getValue reg b == getValue reg c then
-								1
+								Value 1
 							else
-								0
+								Value 0
 						newReg =
 							Data.Map.insert
 								regNum
-								value
+								newValue
 								reg
 					in
 						next newReg rest
@@ -125,12 +140,12 @@ doAdd reg stack =
 	case stack of
 		(a:b:c:rest) ->
 			case withRegister a reg of
-				Just (Register regNum, value) ->
+				Just (Register regNum, _) ->
 					let
 						newReg =
 							Data.Map.insert
 								regNum
-								(mod (b + c) 32768)
+								(Value (mod (b + c) 32768))
 								reg
 					in
 						next
@@ -149,6 +164,7 @@ doWriteAscii reg stack =
 	case stack of
 		(a:rest) ->
 			getValue reg a
+				|> unwrapValue
 				|> Data.Char.chr
 				|> print
 				>>= (\_ -> next reg rest)
