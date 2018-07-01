@@ -1,0 +1,2 @@
+run:
+	stack exec vm
