@@ -11,11 +11,12 @@ newtype Register = Register Int
 newtype Code = Code Int
 
 newtype Value = Value Int deriving (Eq, Show)
+newtype Raw = Raw Int deriving (Eq, Show)
 
 unwrapValue (Value v) =
 	v
 
-type Stack = [Int]
+type Stack = [Raw]
 type Registers = Map Int Value
 
 (|>) x f = f x
@@ -41,6 +42,7 @@ inputToStack input =
 		|> Data.String.Utils.split ","
 		|> Data.List.map parseInt
 		|> Data.Maybe.catMaybes
+		|> Data.List.map Raw
 
 
 parseInt :: String -> Maybe Int
@@ -53,7 +55,7 @@ next registers stack =
 	case stack of
 		[] ->
 			return ()
-		(x:xs) ->
+		(Raw x:xs) ->
 			runInstruction registers (Code x) xs
 
 
@@ -74,27 +76,32 @@ runInstruction registers code stack =
 			print registers
 
 
-getValue :: Registers -> Int -> Value
-getValue reg n =
-	(numToRegister n
-		>>= (\r -> Data.Map.lookup r reg)
+rawToValue :: Registers -> Raw -> Value
+rawToValue registers (Raw n) =
+	(rawToRegister (Raw n)
+		>>= (registerValue registers)
 		)
 		|> fromMaybe (Value n)
 
 
-numToRegister :: Int -> Maybe Int
-numToRegister n =
+rawToRegister :: Raw -> Maybe Register
+rawToRegister (Raw n) =
 	if n >= 32768 && n <= 32775 then
-		Just (n - 32768)
+		Just (Register (n - 32768))
 	else
 		Nothing
 
 
-withRegister :: Int -> Registers -> Maybe (Register, Value)
-withRegister n reg =
-	case numToRegister n of
-		Just regNum ->
-			Just (Register regNum, getValue reg regNum)
+registerValue :: Registers -> Register -> Maybe Value
+registerValue registers (Register regNum) =
+	Data.Map.lookup regNum registers
+
+
+withRegister :: Raw -> Registers -> Maybe (Register, Value)
+withRegister n registers =
+	case rawToRegister n of
+		Just reg ->
+			Just (reg, registerValue registers reg |> fromMaybe (Value 0))
 
 		Nothing ->
 			Nothing
@@ -116,7 +123,7 @@ doEq reg stack =
 				Just (Register regNum, _) ->
 					let
 						newValue =
-							if getValue reg b == getValue reg c then
+							if rawToValue reg b == rawToValue reg c then
 								Value 1
 							else
 								Value 0
@@ -138,7 +145,7 @@ doEq reg stack =
 doAdd :: Registers -> Stack -> IO ()
 doAdd reg stack =
 	case stack of
-		(a:b:c:rest) ->
+		(a:Raw b:Raw c:rest) ->
 			case withRegister a reg of
 				Just (Register regNum, _) ->
 					let
@@ -163,7 +170,7 @@ doWriteAscii :: Registers -> Stack -> IO ()
 doWriteAscii reg stack =
 	case stack of
 		(a:rest) ->
-			getValue reg a
+			rawToValue reg a
 				|> unwrapValue
 				|> Data.Char.chr
 				|> print
