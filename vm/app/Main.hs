@@ -10,7 +10,7 @@ import Data.Char
 newtype Register = Register Int
 newtype Code = Code Int
 
-newtype Value = Value Int deriving Eq, Show
+newtype Value = Value Int deriving (Eq, Show)
 
 unwrapValue (Value v) =
 	v
