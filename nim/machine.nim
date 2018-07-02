@@ -1,5 +1,8 @@
 import strutils, fp/list, fp/option
 
+type
+    Code = distinct int
+
 proc next(stack: List[int]): int
 
 # add: 9 a b c
@@ -15,8 +18,8 @@ proc do_out(stack: List[int]): int =
 
     next(stack.drop(1))
 
-proc process_instruction(code: int, stack: List[int]): int =
-    case code:
+proc process_instruction(code: Code, stack: List[int]): int =
+    case code.int:
         of 9:
             do_add(stack)
         of 19:
@@ -33,7 +36,7 @@ proc next(stack: List[int]): int =
         let code = first.get
         let rest = stack.drop(1)
 
-        process_instruction(code, rest)
+        process_instruction(code.Code, rest)
     else:
         1
 
