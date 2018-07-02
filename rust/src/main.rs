@@ -52,9 +52,34 @@ fn next(stack: Stack, registers: Registers) -> usize {
 fn instruction(Code(code): Code, stack: Stack, registers: Registers) -> usize {
     // println!("{:?}", code);
     match code {
+        0 => istop(stack, registers),
         9 => iadd(stack, registers),
         19 => iout(stack, registers),
         _ => 1,
+    }
+}
+
+// halt: 0
+//   stop execution and terminate the program
+fn istop(stack: Stack, registers: Registers) -> usize {
+    1
+}
+
+// set: 1 a b
+//   set register <a> to the value of <b>
+fn iset(stack: Stack, registers: Registers)  -> usize {
+    match get_2(stack.clone()) {
+        Some((a, b)) => {
+            match register_pos(a) {
+                Some(reg_pos) => {
+                    let value = raw_to_value(b, registers.clone());
+                    let new_registers = set_value_in_register(registers, reg_pos, value);
+                    next(stack.skip(3), new_registers)
+                },
+                None => 0,
+            }
+        },
+        None => 0,
     }
 }
 
@@ -131,6 +156,16 @@ fn set_value_in_register(registers: Registers, RegisterPos(pos): RegisterPos, va
 fn get_1(stack: Stack) -> Option<RawValue> {
     match stack.get(0) {
         Some(a) => Some(*a),
+        _ => None,
+    }
+}
+
+fn get_2(stack: Stack) -> Option<(RawValue, RawValue)> {
+    let a_arc = stack.get(0);
+    let b_arc = stack.get(1);
+
+    match (a_arc, b_arc) {
+        (Some(a), Some(b)) => Some((*a, *b)),
         _ => None,
     }
 }
