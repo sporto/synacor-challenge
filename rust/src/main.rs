@@ -12,9 +12,9 @@ struct Value(i32);
 struct RegisterPos(i32);
 
 #[derive(Copy,Clone,Debug)]
-struct RawValue(i32);
+struct StackValue(i32);
 
-type Stack = Vector<RawValue>;
+type Stack = Vector<StackValue>;
 type Registers = HashMap<i32, Value>;
 
 enum Outcome {
@@ -34,8 +34,8 @@ fn run(input: &str) -> Outcome {
         .split(",")
         .map(|c| c.parse::<i32>() )
         .flat_map(|e| e)
-        .map(|v| RawValue(v))
-        .collect::<Vec<RawValue>>();
+        .map(|v| StackValue(v))
+        .collect::<Vec<StackValue>>();
 
     let stack: Stack = Vector::from(vec);
 
@@ -45,19 +45,21 @@ fn run(input: &str) -> Outcome {
 fn next(stack: Stack, registers: Registers) -> Outcome {
     match stack.pop_front() {
         Some((code_arc, rest)) => {
-            let RawValue(code) = *code_arc;
+            let StackValue(code) = *code_arc;
             instruction(Code(code), rest, registers)
         },
         None => Outcome::Success,
     }
 }
 
-fn instruction(Code(code): Code, stack: Stack, registers: Registers) -> Outcome {
+fn instruction(Code(code): Code, s: Stack, r: Registers) -> Outcome {
     // println!("{:?}", code);
     match code {
-        0 => istop(stack, registers),
-        9 => iadd(stack, registers),
-        19 => iout(stack, registers),
+        0 => istop(s, r),
+        1 => iset(s, r),
+        2 => ipush(s, r),
+        9 => iadd(s, r),
+        19 => iout(s, r),
         _ => Outcome::Fail,
     }
 }
@@ -81,6 +83,20 @@ fn iset(stack: Stack, registers: Registers)  -> Outcome {
                 },
                 None => Outcome::Fail,
             }
+        },
+        None => Outcome::Fail,
+    }
+}
+
+// push: 2 a
+//   push <a> onto the stack
+fn ipush(stack: Stack, registers: Registers) -> Outcome {
+    match get_1(stack.clone()) {
+        Some((new_stack, a)) => {
+            let Value(value) = raw_to_value(a, registers.clone());
+            let new_stack = stack.push_front(StackValue(value));
+
+            next(new_stack, registers)
         },
         None => Outcome::Fail,
     }
@@ -125,7 +141,7 @@ fn iout(stack: Stack, registers: Registers) -> Outcome {
     }
 }
 
-fn raw_to_value(RawValue(n): RawValue, registers: Registers) -> Value {
+fn raw_to_value(StackValue(n): StackValue, registers: Registers) -> Value {
     if n <= 32767 {
         Value(n)
     } else if n <= 32775 {
@@ -138,7 +154,7 @@ fn raw_to_value(RawValue(n): RawValue, registers: Registers) -> Value {
     }
 }
 
-fn register_pos(RawValue(value): RawValue) -> Option<RegisterPos> {
+fn register_pos(StackValue(value): StackValue) -> Option<RegisterPos> {
     if value >= 32768 && value <= 32775 {
         Some(RegisterPos(value - 32768))
     } else {
@@ -156,14 +172,14 @@ fn set_value_in_register(registers: Registers, RegisterPos(pos): RegisterPos, va
     registers.insert(pos, val)
 }
 
-fn get_1(stack: Stack) -> Option<(Stack, RawValue)> {
+fn get_1(stack: Stack) -> Option<(Stack, StackValue)> {
     match stack.get(0) {
         Some(a) => Some((stack.skip(1), *a)),
         _ => None,
     }
 }
 
-fn get_2(stack: Stack) -> Option<(Stack, RawValue, RawValue)> {
+fn get_2(stack: Stack) -> Option<(Stack, StackValue, StackValue)> {
     let a_arc = stack.get(0);
     let b_arc = stack.get(1);
 
@@ -173,7 +189,7 @@ fn get_2(stack: Stack) -> Option<(Stack, RawValue, RawValue)> {
     }
 }
 
-fn get_3(stack: Stack) -> Option<(Stack, RawValue, RawValue, RawValue)> {
+fn get_3(stack: Stack) -> Option<(Stack, StackValue, StackValue, StackValue)> {
     let a_arc = stack.get(0);
     let b_arc = stack.get(1);
     let c_arc = stack.get(2);
