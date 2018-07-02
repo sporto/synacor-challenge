@@ -8,9 +8,7 @@ struct Code(i32);
 
 #[derive(Copy,Clone,Debug)]
 struct Value(i32);
-// struct Raw(i32);
 
-// #[derive(PartialEq,Eq)]
 struct RegisterPos(i32);
 
 #[derive(Copy,Clone,Debug)]
@@ -19,12 +17,17 @@ struct RawValue(i32);
 type Stack = Vector<RawValue>;
 type Registers = HashMap<i32, Value>;
 
+enum Outcome {
+    Success,
+    Fail,
+}
+
 fn main() {
     let input = "9,32768,32769,4,19,32768";
     run(input);
 }
 
-fn run(input: &str) -> usize {
+fn run(input: &str) -> Outcome {
     let registers: Registers = HashMap::new();
 
     let vec = input
@@ -39,35 +42,35 @@ fn run(input: &str) -> usize {
     next(stack, registers)
 }
 
-fn next(stack: Stack, registers: Registers) -> usize {
+fn next(stack: Stack, registers: Registers) -> Outcome {
     match stack.pop_front() {
         Some((code_arc, rest)) => {
             let RawValue(code) = *code_arc;
             instruction(Code(code), rest, registers)
         },
-        None => 1,
+        None => Outcome::Success,
     }
 }
 
-fn instruction(Code(code): Code, stack: Stack, registers: Registers) -> usize {
+fn instruction(Code(code): Code, stack: Stack, registers: Registers) -> Outcome {
     // println!("{:?}", code);
     match code {
         0 => istop(stack, registers),
         9 => iadd(stack, registers),
         19 => iout(stack, registers),
-        _ => 1,
+        _ => Outcome::Fail,
     }
 }
 
 // halt: 0
 //   stop execution and terminate the program
-fn istop(stack: Stack, registers: Registers) -> usize {
-    1
+fn istop(stack: Stack, registers: Registers) -> Outcome {
+    Outcome::Success
 }
 
 // set: 1 a b
 //   set register <a> to the value of <b>
-fn iset(stack: Stack, registers: Registers)  -> usize {
+fn iset(stack: Stack, registers: Registers)  -> Outcome {
     match get_2(stack.clone()) {
         Some((new_stack, a, b)) => {
             match register_pos(a) {
@@ -76,16 +79,16 @@ fn iset(stack: Stack, registers: Registers)  -> usize {
                     let new_registers = set_value_in_register(registers, reg_pos, value);
                     next(new_stack, new_registers)
                 },
-                None => 0,
+                None => Outcome::Fail,
             }
         },
-        None => 0,
+        None => Outcome::Fail,
     }
 }
 
 // # add: 9 a b c
 // #   assign into <a> the sum of <b> and <c> (modulo 32768)
-fn iadd(stack: Stack, registers: Registers) -> usize {
+fn iadd(stack: Stack, registers: Registers) -> Outcome {
     match get_3(stack.clone()) {
         Some((new_stack, a, b, c)) => {
             match register_pos(a) {
@@ -99,16 +102,16 @@ fn iadd(stack: Stack, registers: Registers) -> usize {
 
                     next(new_stack, new_registers)
                 },
-                None => 0,
+                None => Outcome::Fail,
             }
         },
-        _ => 1,
+        _ => Outcome::Fail,
     }
 }
 
 // out: 19 a
 //   write the character represented by ascii code <a> to the terminal
-fn iout(stack: Stack, registers: Registers) -> usize {
+fn iout(stack: Stack, registers: Registers) -> Outcome {
     match get_1(stack.clone()) {
         Some((new_stack, a_raw)) => {
             let Value(val) = raw_to_value(a_raw, registers.clone());
@@ -118,7 +121,7 @@ fn iout(stack: Stack, registers: Registers) -> usize {
             }
             next(new_stack, registers)
         }
-        None => 1,
+        None => Outcome::Fail,
     }
 }
 
