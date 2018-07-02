@@ -3,6 +3,7 @@ extern crate im;
 use im::Vector;
 use im::HashMap;
 use std::sync::Arc;
+// use std::ops::Deref;
 
 type Stack = Vector<i32>;
 type Registers = HashMap<i32, i32>;
@@ -49,32 +50,32 @@ fn iadd(stack: Stack, registers: Registers) -> usize {
         Some((a, b, c)) => {
             // do
             println!("{:?} {:?} {:?}", a, b, c);
-            let b_val = get_value(b, registers);
-            let c_val = get_value(c, registers);
+            let b_val = get_value(b, registers.clone());
+            let c_val = get_value(c, registers.clone());
             next(stack.skip(3), registers)
         },
         _ => 1,
     }
 }
 
-fn get_value(n: Arc<i32>, registers: Registers) -> Arc<i32> {
+fn get_value(n: i32, registers: Registers) -> i32 {
     if n <= 32767 {
-        Arc::new(n)
+        n
     } else if n <= 32775 {
         let pos = n - 32768;
-        registers.get(&pos).unwrap_or(Arc::new(0))
+        registers.get(&pos).map(|value| *value).unwrap_or(0)
     } else {
-        Arc::new(0)
+        0
     }
 }
 
-fn get_3(stack: Stack) -> Option<(Arc<i32>, Arc<i32>, Arc<i32>)> {
+fn get_3(stack: Stack) -> Option<(i32, i32, i32)> {
     let aa = stack.get(0);
     let bb = stack.get(1);
     let cc = stack.get(2);
 
     match (aa, bb, cc) {
-        (Some(a), Some(b), Some(c)) => Some((a, b, c)),
+        (Some(a), Some(b), Some(c)) => Some((*a, *b, *c)),
         _ => None,
     }
 }
