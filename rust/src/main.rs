@@ -69,12 +69,12 @@ fn istop(stack: Stack, registers: Registers) -> usize {
 //   set register <a> to the value of <b>
 fn iset(stack: Stack, registers: Registers)  -> usize {
     match get_2(stack.clone()) {
-        Some((a, b)) => {
+        Some((new_stack, a, b)) => {
             match register_pos(a) {
                 Some(reg_pos) => {
                     let value = raw_to_value(b, registers.clone());
                     let new_registers = set_value_in_register(registers, reg_pos, value);
-                    next(stack.skip(3), new_registers)
+                    next(new_stack, new_registers)
                 },
                 None => 0,
             }
@@ -87,7 +87,7 @@ fn iset(stack: Stack, registers: Registers)  -> usize {
 // #   assign into <a> the sum of <b> and <c> (modulo 32768)
 fn iadd(stack: Stack, registers: Registers) -> usize {
     match get_3(stack.clone()) {
-        Some((a, b, c)) => {
+        Some((new_stack, a, b, c)) => {
             match register_pos(a) {
                 Some(reg_pos) => {
                     let Value(b_val) = raw_to_value(b, registers.clone());
@@ -97,7 +97,7 @@ fn iadd(stack: Stack, registers: Registers) -> usize {
 
                     let new_registers = set_value_in_register(registers, reg_pos, Value(sum));
 
-                    next(stack.skip(3), new_registers)
+                    next(new_stack, new_registers)
                 },
                 None => 0,
             }
@@ -110,13 +110,13 @@ fn iadd(stack: Stack, registers: Registers) -> usize {
 //   write the character represented by ascii code <a> to the terminal
 fn iout(stack: Stack, registers: Registers) -> usize {
     match get_1(stack.clone()) {
-        Some(a_raw) => {
+        Some((new_stack, a_raw)) => {
             let Value(val) = raw_to_value(a_raw, registers.clone());
             match char::from_u32(val as u32) {
                 Some(c) => print!("{:?}", c),
                 None => (),
             }
-            next(stack.skip(1), registers)
+            next(new_stack, registers)
         }
         None => 1,
     }
@@ -153,30 +153,30 @@ fn set_value_in_register(registers: Registers, RegisterPos(pos): RegisterPos, va
     registers.insert(pos, val)
 }
 
-fn get_1(stack: Stack) -> Option<RawValue> {
+fn get_1(stack: Stack) -> Option<(Stack, RawValue)> {
     match stack.get(0) {
-        Some(a) => Some(*a),
+        Some(a) => Some((stack.skip(1), *a)),
         _ => None,
     }
 }
 
-fn get_2(stack: Stack) -> Option<(RawValue, RawValue)> {
+fn get_2(stack: Stack) -> Option<(Stack, RawValue, RawValue)> {
     let a_arc = stack.get(0);
     let b_arc = stack.get(1);
 
     match (a_arc, b_arc) {
-        (Some(a), Some(b)) => Some((*a, *b)),
+        (Some(a), Some(b)) => Some((stack.skip(2), *a, *b)),
         _ => None,
     }
 }
 
-fn get_3(stack: Stack) -> Option<(RawValue, RawValue, RawValue)> {
+fn get_3(stack: Stack) -> Option<(Stack, RawValue, RawValue, RawValue)> {
     let a_arc = stack.get(0);
     let b_arc = stack.get(1);
     let c_arc = stack.get(2);
 
     match (a_arc, b_arc, c_arc) {
-        (Some(a), Some(b), Some(c)) => Some((*a, *b, *c)),
+        (Some(a), Some(b), Some(c)) => Some((stack.skip(3), *a, *b, *c)),
         _ => None,
     }
 }
