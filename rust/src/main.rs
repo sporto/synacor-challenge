@@ -9,10 +9,10 @@ struct InstructionCode(i32);
 #[derive(Copy,Clone,Debug)]
 struct Value(i32);
 
-struct RegisterPos(i32);
-
 #[derive(Copy,Clone,Debug)]
 struct InstructionValue(i32);
+
+struct RegisterPos(i32);
 
 type Instructions = Vector<InstructionValue>;
 type Registers = HashMap<i32, Value>;
@@ -26,6 +26,7 @@ enum Outcome {
 fn main() {
     let input = "9,32768,32769,4,19,32768";
     run(input);
+    // println!("{:?}", i32::max_value());
 }
 
 fn run(input: &str) -> Outcome {
@@ -123,7 +124,23 @@ fn i_push(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
 // pop: 3 a
 //   remove the top element from the stack and write it into <a>; empty stack = error
 fn i_pop(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    Outcome::Fail
+    match pop_stack(stack) {
+        Some((new_stack, value)) => {
+            match get_1(ins.clone()) {
+                Some((rest, a)) => {
+                    match register_pos(a) {
+                        Some(reg_pos) => {
+                            let new_registers = set_value_in_register(regs, reg_pos, value);
+                            next(rest, new_registers, new_stack)
+                        },
+                        None => Outcome::Fail,
+                    }
+                },
+                None => Outcome::Fail,
+            }
+        },
+        None => Outcome::Fail,
+    }
 }
 // eq: 4 a b c
 //   set <a> to 1 if <b> is equal to <c>; set it to 0 otherwise
@@ -246,21 +263,21 @@ fn i_noop(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
 }
 
 fn raw_to_value(InstructionValue(n): InstructionValue, regs: Registers) -> Value {
-    if n <= 32767 {
-        Value(n)
-    } else if n <= 32775 {
-        let pos = RegisterPos(n - 32768);
-
-        get_value_from_register(regs, pos)
-            .unwrap_or(Value(0))
-    } else {
-        Value(0)
+    match register_pos(InstructionValue(n)) {
+        Some(reg) => {
+            get_value_from_register(regs, reg)
+                .unwrap_or(Value(0))
+        },
+        None => {
+            Value(n)
+        },
     }
 }
 
 fn register_pos(InstructionValue(value): InstructionValue) -> Option<RegisterPos> {
-    if value >= 32768 && value <= 32775 {
-        Some(RegisterPos(value - 32768))
+    let pos = value - 32768;
+    if pos >= 0 && pos <= 7 {
+        Some(RegisterPos(pos))
     } else {
         None
     }
@@ -272,8 +289,15 @@ fn get_value_from_register(regs: Registers, RegisterPos(pos): RegisterPos) -> Op
         .map(|arc| *arc)
 }
 
-fn set_value_in_register(regs: Registers, RegisterPos(pos): RegisterPos, val: Value) -> Registers {
-    regs.insert(pos, val)
+fn set_value_in_register(regs: Registers, RegisterPos(reg_pos): RegisterPos, val: Value) -> Registers {
+    regs.insert(reg_pos, val)
+}
+
+fn pop_stack(stack: Stack) -> Option<(Stack, Value)> {
+    match stack.pop_front() {
+        Some((a,new_stack)) => Some((new_stack, *a)),
+        None => None,
+    }
 }
 
 fn get_1(ins: Instructions) -> Option<(Instructions, InstructionValue)> {
