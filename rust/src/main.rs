@@ -2,7 +2,7 @@ extern crate im;
 
 use im::Vector;
 use im::HashMap;
-use std::sync::Arc;
+use std::char;
 
 struct Code(i32);
 
@@ -41,8 +41,8 @@ fn run(input: &str) -> usize {
 
 fn next(stack: Stack, registers: Registers) -> usize {
     match stack.pop_front() {
-        Some((codeArc, rest)) => {
-            let RawValue(code) = *codeArc;
+        Some((code_arc, rest)) => {
+            let RawValue(code) = *code_arc;
             instruction(Code(code), rest, registers)
         },
         None => 1,
@@ -53,6 +53,7 @@ fn instruction(Code(code): Code, stack: Stack, registers: Registers) -> usize {
     // println!("{:?}", code);
     match code {
         9 => iadd(stack, registers),
+        19 => iout(stack, registers),
         _ => 1,
     }
 }
@@ -62,13 +63,37 @@ fn instruction(Code(code): Code, stack: Stack, registers: Registers) -> usize {
 fn iadd(stack: Stack, registers: Registers) -> usize {
     match get_3(stack.clone()) {
         Some((a, b, c)) => {
-            // do
-            println!("{:?} {:?} {:?}", a, b, c);
-            let b_val = raw_to_value(b, registers.clone());
-            let c_val = raw_to_value(c, registers.clone());
-            next(stack.skip(3), registers)
+            match register_pos(a) {
+                Some(reg_pos) => {
+                    let Value(b_val) = raw_to_value(b, registers.clone());
+                    let Value(c_val) = raw_to_value(c, registers.clone());
+                    let sum = (b_val + c_val) % 32768;
+                    // println!("sum {:?}", b_val);
+
+                    let new_registers = set_value_in_register(registers, reg_pos, Value(sum));
+
+                    next(stack.skip(3), new_registers)
+                },
+                None => 0,
+            }
         },
         _ => 1,
+    }
+}
+
+// out: 19 a
+//   write the character represented by ascii code <a> to the terminal
+fn iout(stack: Stack, registers: Registers) -> usize {
+    match get_1(stack.clone()) {
+        Some(a_raw) => {
+            let Value(val) = raw_to_value(a_raw, registers.clone());
+            match char::from_u32(val as u32) {
+                Some(c) => print!("{:?}", c),
+                None => (),
+            }
+            next(stack.skip(1), registers)
+        }
+        None => 1,
     }
 }
 
@@ -85,18 +110,37 @@ fn raw_to_value(RawValue(n): RawValue, registers: Registers) -> Value {
     }
 }
 
+fn register_pos(RawValue(value): RawValue) -> Option<RegisterPos> {
+    if value >= 32768 && value <= 32775 {
+        Some(RegisterPos(value - 32768))
+    } else {
+        None
+    }
+}
+
 fn get_value_from_register(registers: Registers, RegisterPos(pos): RegisterPos) -> Option<Value> {
     registers
         .get(&pos)
         .map(|arc| *arc)
 }
 
-fn get_3(stack: Stack) -> Option<(RawValue, RawValue, RawValue)> {
-    let aArc = stack.get(0);
-    let bArc = stack.get(1);
-    let cArc = stack.get(2);
+fn set_value_in_register(registers: Registers, RegisterPos(pos): RegisterPos, val: Value) -> Registers {
+    registers.insert(pos, val)
+}
 
-    match (aArc, bArc, cArc) {
+fn get_1(stack: Stack) -> Option<RawValue> {
+    match stack.get(0) {
+        Some(a) => Some(*a),
+        _ => None,
+    }
+}
+
+fn get_3(stack: Stack) -> Option<(RawValue, RawValue, RawValue)> {
+    let a_arc = stack.get(0);
+    let b_arc = stack.get(1);
+    let c_arc = stack.get(2);
+
+    match (a_arc, b_arc, c_arc) {
         (Some(a), Some(b), Some(c)) => Some((*a, *b, *c)),
         _ => None,
     }
