@@ -3,10 +3,21 @@ extern crate im;
 use im::Vector;
 use im::HashMap;
 use std::sync::Arc;
-// use std::ops::Deref;
 
-type Stack = Vector<i32>;
-type Registers = HashMap<i32, i32>;
+struct Code(i32);
+
+#[derive(Copy,Clone,Debug)]
+struct Value(i32);
+// struct Raw(i32);
+
+// #[derive(PartialEq,Eq)]
+struct RegisterPos(i32);
+
+#[derive(Copy,Clone,Debug)]
+struct RawValue(i32);
+
+type Stack = Vector<RawValue>;
+type Registers = HashMap<i32, Value>;
 
 fn main() {
     let input = "9,32768,32769,4,19,32768";
@@ -20,7 +31,8 @@ fn run(input: &str) -> usize {
         .split(",")
         .map(|c| c.parse::<i32>() )
         .flat_map(|e| e)
-        .collect::<Vec<i32>>();
+        .map(|v| RawValue(v))
+        .collect::<Vec<RawValue>>();
 
     let stack: Stack = Vector::from(vec);
 
@@ -29,13 +41,15 @@ fn run(input: &str) -> usize {
 
 fn next(stack: Stack, registers: Registers) -> usize {
     match stack.pop_front() {
-        Some((code, rest)) =>
-            instruction(*code, rest, registers),
+        Some((codeArc, rest)) => {
+            let RawValue(code) = *codeArc;
+            instruction(Code(code), rest, registers)
+        },
         None => 1,
     }
 }
 
-fn instruction(code: i32, stack: Stack, registers: Registers) -> usize {
+fn instruction(Code(code): Code, stack: Stack, registers: Registers) -> usize {
     // println!("{:?}", code);
     match code {
         9 => iadd(stack, registers),
@@ -50,31 +64,39 @@ fn iadd(stack: Stack, registers: Registers) -> usize {
         Some((a, b, c)) => {
             // do
             println!("{:?} {:?} {:?}", a, b, c);
-            let b_val = get_value(b, registers.clone());
-            let c_val = get_value(c, registers.clone());
+            let b_val = raw_to_value(b, registers.clone());
+            let c_val = raw_to_value(c, registers.clone());
             next(stack.skip(3), registers)
         },
         _ => 1,
     }
 }
 
-fn get_value(n: i32, registers: Registers) -> i32 {
+fn raw_to_value(RawValue(n): RawValue, registers: Registers) -> Value {
     if n <= 32767 {
-        n
+        Value(n)
     } else if n <= 32775 {
-        let pos = n - 32768;
-        registers.get(&pos).map(|value| *value).unwrap_or(0)
+        let pos = RegisterPos(n - 32768);
+
+        get_value_from_register(registers, pos)
+            .unwrap_or(Value(0))
     } else {
-        0
+        Value(0)
     }
 }
 
-fn get_3(stack: Stack) -> Option<(i32, i32, i32)> {
-    let aa = stack.get(0);
-    let bb = stack.get(1);
-    let cc = stack.get(2);
+fn get_value_from_register(registers: Registers, RegisterPos(pos): RegisterPos) -> Option<Value> {
+    registers
+        .get(&pos)
+        .map(|arc| *arc)
+}
 
-    match (aa, bb, cc) {
+fn get_3(stack: Stack) -> Option<(RawValue, RawValue, RawValue)> {
+    let aArc = stack.get(0);
+    let bArc = stack.get(1);
+    let cArc = stack.get(2);
+
+    match (aArc, bArc, cArc) {
         (Some(a), Some(b), Some(c)) => Some((*a, *b, *c)),
         _ => None,
     }
