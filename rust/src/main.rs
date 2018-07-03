@@ -332,7 +332,19 @@ fn i_add(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Ou
 // mult: 10 a b c
 //   store into <a> the product of <b> and <c> (modulo 32768)
 fn i_mult(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    Outcome::Fail
+    get_3(offset, ins.clone())
+    .and_then(|(new_offset, a, b, c)|
+        register_pos(a).map(|reg_pos| {
+            let Value(bval) = raw_to_value(b, regs.clone());
+            let Value(cval) = raw_to_value(c, regs.clone());
+
+            let product = (bval * cval) % 32768;
+
+            let new_registers = set_value_in_register(regs, reg_pos, Value(product));
+
+            Outcome::Continue(new_offset, new_registers, stack)
+        })
+    ).unwrap_or(Outcome::Fail)
 }
 // mod: 11 a b c
 //   store into <a> the remainder of <b> divided by <c>
