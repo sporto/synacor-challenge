@@ -18,7 +18,7 @@ enum Ins {
     Jf,
     Add,
     Mult,
-    Store,
+    Mod,
     And,
     Or,
     Not,
@@ -110,7 +110,7 @@ fn get_next_instruction(Offset(offset): Offset, ins: Instructions) -> Option<Ins
                 8 => Some(Ins::Jf),
                 9 => Some(Ins::Add),
                 10 =>Some(Ins::Mult),
-                11 => Some(Ins::Store),
+                11 => Some(Ins::Mod),
                 12 => Some(Ins::And),
                 13 => Some(Ins::Or),
                 14 => Some(Ins::Not),
@@ -141,7 +141,7 @@ fn run_instruction(code: Ins, offset: Offset, ins: Instructions, r: Registers, s
         Ins::Jf => i_jf(offset, ins, r, s),
         Ins::Add => i_add(offset, ins, r, s),
         Ins::Mult => i_mult(offset, ins, r, s),
-        Ins::Store => i_store(offset, ins, r, s),
+        Ins::Mod => i_mod(offset, ins, r, s),
         Ins::And => i_and(offset, ins, r, s),
         Ins::Or => i_or(offset, ins, r, s),
         Ins::Not => i_not(offset, ins, r, s),
@@ -350,8 +350,20 @@ fn i_mult(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> O
 }
 // mod: 11 a b c
 //   store into <a> the remainder of <b> divided by <c>
-fn i_store(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    Outcome::Fail
+fn i_mod(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+    get_3(offset, ins.clone())
+    .and_then(|(new_offset, a, b, c)|
+        register_pos(a).map(|reg_pos| {
+            let Value(bval) = raw_to_value(b, regs.clone());
+            let Value(cval) = raw_to_value(c, regs.clone());
+
+            let value = bval % cval;
+
+            let new_registers = set_value_in_register(regs, reg_pos, Value(value));
+
+            Outcome::Continue(new_offset, new_registers, stack)
+        })
+    ).unwrap_or(Outcome::Fail)
 }
 // and: 12 a b c
 //   stores into <a> the bitwise and of <b> and <c>
