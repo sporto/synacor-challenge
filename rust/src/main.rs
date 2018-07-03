@@ -14,6 +14,8 @@ struct InstructionValue(i32);
 
 struct RegisterPos(i32);
 
+struct Offset(usize);
+
 type Instructions = Vector<InstructionValue>;
 type Registers = HashMap<i32, Value>;
 type Stack = Vector<Value>;
@@ -21,7 +23,7 @@ type Stack = Vector<Value>;
 enum Outcome {
     Success,
     Fail,
-    Continue(Instructions, Registers, Stack),
+    Continue(Offset, Registers, Stack),
 }
 
 fn main() {
@@ -43,18 +45,17 @@ fn run(input: &str) -> Outcome {
     let ins: Instructions = Vector::from(vec);
     let stack: Stack = Vector::new();
 
-    next(ins, regs, stack)
+    next(Offset(0), ins, regs, stack)
 }
 
-fn next(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    match ins.pop_front() {
-        Some((code_arc, rest)) => {
-            let InstructionValue(code) = *code_arc;
-            let outcome = instruction(InstructionCode(code), rest, regs, stack);
+fn next(Offset(offset): Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+    match get_next_instruction(Offset(offset), ins.clone()) {
+        Some(code) => {
+            let outcome = instruction(code, Offset(offset + 1), ins.clone(), regs, stack);
 
             match outcome {
-                Outcome::Continue(new_ins, new_regs, new_stack) =>
-                    next(new_ins, new_regs, new_stack),
+                Outcome::Continue(new_offset, new_regs, new_stack) =>
+                    next(new_offset, ins, new_regs, new_stack),
                 Outcome::Success =>
                     Outcome::Success,
                 Outcome::Fail =>
@@ -65,30 +66,40 @@ fn next(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     }
 }
 
-fn instruction(InstructionCode(code): InstructionCode, rest: Instructions, r: Registers, s: Stack) -> Outcome {
+fn get_next_instruction(Offset(offset): Offset, ins: Instructions) -> Option<InstructionCode> {
+    match ins.get(offset) {
+        Some(a) => {
+            let InstructionValue(code) = *a;
+            Some(InstructionCode(code))
+        },
+        None => None,
+    }
+}
+
+fn instruction(InstructionCode(code): InstructionCode, offset: Offset, ins: Instructions, r: Registers, s: Stack) -> Outcome {
     match code {
         0 => i_stop(),
-        1 => i_set(rest, r, s),
-        2 => i_push(rest, r, s),
-        3 => i_pop(rest, r, s),
-        4 => i_eq(rest, r, s),
-        5 => i_gt(rest, r, s),
-        6 => i_jmp(rest, r, s),
-        7 => i_jt(rest, r, s),
-        8 => i_jf(rest, r, s),
-        9 => i_add(rest, r, s),
-        10 => i_mult(rest, r, s),
-        11 => i_store(rest, r, s),
-        12 => i_and(rest, r, s),
-        13 => i_or(rest, r, s),
-        14 => i_not(rest, r, s),
-        15 => i_rmem(rest, r, s),
-        16 => i_wmem(rest, r, s),
-        17 => i_call(rest, r, s),
-        18 => i_ret(rest, r, s),
-        19 => i_out(rest, r, s),
-        20 => i_in(rest, r, s),
-        21 => i_noop(rest, r, s),
+        1 => i_set(offset, ins, r, s),
+        2 => i_push(offset, ins, r, s),
+        3 => i_pop(offset, ins, r, s),
+        4 => i_eq(offset, ins, r, s),
+        5 => i_gt(offset, ins, r, s),
+        6 => i_jmp(offset, ins, r, s),
+        7 => i_jt(offset, ins, r, s),
+        8 => i_jf(offset, ins, r, s),
+        9 => i_add(offset, ins, r, s),
+        10 => i_mult(offset, ins, r, s),
+        11 => i_store(offset, ins, r, s),
+        12 => i_and(offset, ins, r, s),
+        13 => i_or(offset, ins, r, s),
+        14 => i_not(offset, ins, r, s),
+        15 => i_rmem(offset, ins, r, s),
+        16 => i_wmem(offset, ins, r, s),
+        17 => i_call(offset, ins, r, s),
+        18 => i_ret(offset, ins, r, s),
+        19 => i_out(offset, ins, r, s),
+        20 => i_in(offset, ins, r, s),
+        21 => i_noop(offset, ins, r, s),
         _ => Outcome::Fail,
     }
 }
@@ -101,14 +112,14 @@ fn i_stop() -> Outcome {
 
 // set: 1 a b
 //   set register <a> to the value of <b>
-fn i_set(ins: Instructions, regs: Registers, stack: Stack)  -> Outcome {
-    match get_2(ins.clone()) {
-        Some((rest, a, b)) => {
+fn i_set(offset: Offset, ins: Instructions, regs: Registers, stack: Stack)  -> Outcome {
+    match get_2(offset, ins.clone()) {
+        Some((new_offset, a, b)) => {
             match register_pos(a) {
                 Some(reg_pos) => {
                     let value = raw_to_value(b, regs.clone());
                     let new_registers = set_value_in_register(regs, reg_pos, value);
-                    Outcome::Continue(rest, new_registers, stack)
+                    Outcome::Continue(new_offset, new_registers, stack)
                 },
                 None => Outcome::Fail,
             }
@@ -119,13 +130,13 @@ fn i_set(ins: Instructions, regs: Registers, stack: Stack)  -> Outcome {
 
 // push: 2 a
 //   push <a> onto the stack
-fn i_push(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    match get_1(ins.clone()) {
-        Some((rest, a)) => {
+fn i_push(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+    match get_1(offset, ins.clone()) {
+        Some((new_offset, a)) => {
             let value = raw_to_value(a, regs.clone());
             let new_stack = stack.push_front(value);
 
-            Outcome::Continue(rest, regs, new_stack)
+            Outcome::Continue(new_offset, regs, new_stack)
         },
         None => Outcome::Fail,
     }
@@ -133,15 +144,15 @@ fn i_push(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
 
 // pop: 3 a
 //   remove the top element from the stack and write it into <a>; empty stack = error
-fn i_pop(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+fn i_pop(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     match pop_stack(stack) {
         Some((new_stack, value)) => {
-            match get_1(ins.clone()) {
-                Some((rest, a)) => {
+            match get_1(offset, ins.clone()) {
+                Some((new_offset, a)) => {
                     match register_pos(a) {
                         Some(reg_pos) => {
                             let new_registers = set_value_in_register(regs, reg_pos, value);
-                            Outcome::Continue(rest, new_registers, new_stack)
+                            Outcome::Continue(new_offset, new_registers, new_stack)
                         },
                         None => Outcome::Fail,
                     }
@@ -154,34 +165,34 @@ fn i_pop(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
 }
 // eq: 4 a b c
 //   set <a> to 1 if <b> is equal to <c>; set it to 0 otherwise
-fn i_eq(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+fn i_eq(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     Outcome::Fail
 }
 // gt: 5 a b c
 //   set <a> to 1 if <b> is greater than <c>; set it to 0 otherwise
-fn i_gt(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+fn i_gt(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     Outcome::Fail
 }
 // jmp: 6 a
 //   jump to <a>
-fn i_jmp(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+fn i_jmp(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     Outcome::Fail
 }
 // jt: 7 a b
 //   if <a> is nonzero, jump to <b>
-fn i_jt(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+fn i_jt(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     Outcome::Fail
 }
 // jf: 8 a b
 //   if <a> is zero, jump to <b>
-fn i_jf(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+fn i_jf(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     Outcome::Fail
 }
 // # add: 9 a b c
 // #   assign into <a> the sum of <b> and <c> (modulo 32768)
-fn i_add(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    match get_3(ins.clone()) {
-        Some((rest, a, b, c)) => {
+fn i_add(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+    match get_3(offset, ins.clone()) {
+        Some((new_offset, a, b, c)) => {
             match register_pos(a) {
                 Some(reg_pos) => {
                     let Value(b_val) = raw_to_value(b, regs.clone());
@@ -191,7 +202,7 @@ fn i_add(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
 
                     let new_registers = set_value_in_register(regs, reg_pos, Value(sum));
 
-                    Outcome::Continue(rest, new_registers, stack)
+                    Outcome::Continue(new_offset, new_registers, stack)
                 },
                 None => Outcome::Fail,
             }
@@ -202,60 +213,60 @@ fn i_add(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
 
 // mult: 10 a b c
 //   store into <a> the product of <b> and <c> (modulo 32768)
-fn i_mult(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+fn i_mult(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     Outcome::Fail
 }
 // mod: 11 a b c
 //   store into <a> the remainder of <b> divided by <c>
-fn i_store(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+fn i_store(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     Outcome::Fail
 }
 // and: 12 a b c
 //   stores into <a> the bitwise and of <b> and <c>
-fn i_and(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+fn i_and(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     Outcome::Fail
 }
 // or: 13 a b c
 //   stores into <a> the bitwise or of <b> and <c>
-fn i_or(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+fn i_or(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     Outcome::Fail
 }
 // not: 14 a b
 //   stores 15-bit bitwise inverse of <b> in <a>
-fn i_not(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+fn i_not(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     Outcome::Fail
 }
 // rmem: 15 a b
 //   read memory at address <b> and write it to <a>
-fn i_rmem(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+fn i_rmem(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     Outcome::Fail
 }
 // wmem: 16 a b
 //   write the value from <b> into memory at address <a>
-fn i_wmem(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+fn i_wmem(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     Outcome::Fail
 }
 // call: 17 a
 //   write the address of the next instruction to the stack and jump to <a>
-fn i_call(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+fn i_call(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     Outcome::Fail
 }
 // ret: 18
 //   remove the top element from the stack and jump to it; empty stack = halt
-fn i_ret(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+fn i_ret(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     Outcome::Fail
 }
 // out: 19 a
 //   write the character represented by ascii code <a> to the terminal
-fn i_out(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    match get_1(ins.clone()) {
-        Some((rest, a_raw)) => {
+fn i_out(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+    match get_1(offset, ins.clone()) {
+        Some((new_offset, a_raw)) => {
             let Value(val) = raw_to_value(a_raw, regs.clone());
             match char::from_u32(val as u32) {
                 Some(c) => print!("{:?}", c),
                 None => (),
             }
-            Outcome::Continue(rest, regs, stack)
+            Outcome::Continue(new_offset, regs, stack)
         }
         None => Outcome::Fail,
     }
@@ -263,12 +274,12 @@ fn i_out(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
 
 // in: 20 a
 //   read a character from the terminal and write its ascii code to <a>; it can be assumed that once input starts, it will continue until a newline is encountered; this means that you can safely read whole lines from the keyboard and trust that they will be fully read
-fn i_in(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+fn i_in(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     Outcome::Fail
 }
 // noop: 21
 //   no operation
-fn i_noop(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
+fn i_noop(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     Outcome::Fail
 }
 
@@ -310,30 +321,48 @@ fn pop_stack(stack: Stack) -> Option<(Stack, Value)> {
     }
 }
 
-fn get_1(ins: Instructions) -> Option<(Instructions, InstructionValue)> {
-    match ins.get(0) {
-        Some(a) => Some((ins.skip(1), *a)),
+fn get_1(Offset(offset): Offset, ins: Instructions) -> Option<(Offset, InstructionValue)> {
+    match ins.get(offset) {
+        Some(a) => Some(
+            (
+                Offset(offset + 1),
+                *a,
+            )
+        ),
         _ => None,
     }
 }
 
-fn get_2(ins: Instructions) -> Option<(Instructions, InstructionValue, InstructionValue)> {
-    let a_arc = ins.get(0);
-    let b_arc = ins.get(1);
+fn get_2(Offset(offset): Offset, ins: Instructions) -> Option<(Offset, InstructionValue, InstructionValue)> {
+    let a_arc = ins.get(offset);
+    let b_arc = ins.get(offset + 1);
 
     match (a_arc, b_arc) {
-        (Some(a), Some(b)) => Some((ins.skip(2), *a, *b)),
+        (Some(a), Some(b)) => Some(
+            (
+                Offset(offset + 2),
+                *a,
+                *b,
+            )
+        ),
         _ => None,
     }
 }
 
-fn get_3(ins: Instructions) -> Option<(Instructions, InstructionValue, InstructionValue, InstructionValue)> {
-    let a_arc = ins.get(0);
-    let b_arc = ins.get(1);
-    let c_arc = ins.get(2);
+fn get_3(Offset(offset): Offset, ins: Instructions) -> Option<(Offset, InstructionValue, InstructionValue, InstructionValue)> {
+    let a_arc = ins.get(offset);
+    let b_arc = ins.get(offset + 1);
+    let c_arc = ins.get(offset + 2);
 
     match (a_arc, b_arc, c_arc) {
-        (Some(a), Some(b), Some(c)) => Some((ins.skip(3), *a, *b, *c)),
+        (Some(a), Some(b), Some(c)) => Some(
+            (
+                Offset(offset + 3),
+                *a,
+                *b,
+                *c,
+            )
+        ),
         _ => None,
     }
 }
