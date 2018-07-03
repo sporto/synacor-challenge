@@ -271,7 +271,21 @@ fn i_jmp(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Ou
 // jt: 7 a b
 //   if <a> is nonzero, jump to <b>
 fn i_jt(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    Outcome::Fail
+    get_2(offset, ins.clone())
+    .map(|(new_offset, a, b)|
+        {
+            let Value(a_val) = raw_to_value(a, regs.clone());
+            let Value(b_val) = raw_to_value(b, regs.clone());
+        
+            let next_offset = if a_val == 0 {
+                new_offset
+            } else {
+                Offset(b_val as usize)
+            };
+
+            Outcome::Continue(next_offset, regs, stack)
+        }
+    ).unwrap_or(Outcome::Fail)
 }
 // jf: 8 a b
 //   if <a> is zero, jump to <b>
