@@ -215,8 +215,26 @@ fn i_pop(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Ou
 // eq: 4 a b c
 //   set <a> to 1 if <b> is equal to <c>; set it to 0 otherwise
 fn i_eq(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    Outcome::Fail
+        get_3(offset, ins.clone())
+        .and_then(|(new_offset, a, b, c)|
+            register_pos(a).map(|reg_pos| {
+                    let Value(b_val) = raw_to_value(b, regs.clone());
+                    let Value(c_val) = raw_to_value(c, regs.clone());
+
+                    let value = if b_val == c_val {
+                        Value(1)
+                    } else {
+                        Value(0)
+                    };
+
+                    let new_registers = set_value_in_register(regs, reg_pos, value);
+
+                    Outcome::Continue(new_offset, new_registers, stack)
+                }
+            )
+        ).unwrap_or(Outcome::Fail)
 }
+
 // gt: 5 a b c
 //   set <a> to 1 if <b> is greater than <c>; set it to 0 otherwise
 fn i_gt(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
