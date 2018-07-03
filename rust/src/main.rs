@@ -290,7 +290,21 @@ fn i_jt(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Out
 // jf: 8 a b
 //   if <a> is zero, jump to <b>
 fn i_jf(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    Outcome::Fail
+    get_2(offset, ins.clone())
+    .map(|(new_offset, a, b)|
+        {
+            let Value(a_val) = raw_to_value(a, regs.clone());
+            let Value(b_val) = raw_to_value(b, regs.clone());
+        
+            let next_offset = if a_val == 0 {
+                Offset(b_val as usize)
+            } else {
+                new_offset
+            };
+
+            Outcome::Continue(next_offset, regs, stack)
+        }
+    ).unwrap_or(Outcome::Fail)
 }
 // # add: 9 a b c
 // #   assign into <a> the sum of <b> and <c> (modulo 32768)
