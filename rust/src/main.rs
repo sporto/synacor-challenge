@@ -4,6 +4,8 @@ use im::Vector;
 use im::HashMap;
 use std::char;
 
+const MODULO: i32 = 32768;
+
 enum Ins {
     Stop,
     Set,
@@ -315,7 +317,7 @@ fn i_add(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Ou
                 Some(reg_pos) => {
                     let Value(b_val) = raw_to_value(b, regs.clone());
                     let Value(c_val) = raw_to_value(c, regs.clone());
-                    let sum = (b_val + c_val) % 32768;
+                    let sum = (b_val + c_val) % MODULO;
                     // println!("sum {:?}", b_val);
 
                     let new_registers = set_value_in_register(regs, reg_pos, Value(sum));
@@ -338,7 +340,7 @@ fn i_mult(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> O
             let Value(bval) = raw_to_value(b, regs.clone());
             let Value(cval) = raw_to_value(c, regs.clone());
 
-            let product = (bval * cval) % 32768;
+            let product = (bval * cval) % MODULO;
 
             let new_registers = set_value_in_register(regs, reg_pos, Value(product));
 
