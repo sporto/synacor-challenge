@@ -4,7 +4,30 @@ use im::Vector;
 use im::HashMap;
 use std::char;
 
-struct InstructionCode(i32);
+enum Ins {
+    Stop,
+    Set,
+    Push,
+    Pop,
+    Eq,
+    Gt,
+    Jmp,
+    Jt,
+    Jf,
+    Add,
+    Mult,
+    Store,
+    And,
+    Or,
+    Not,
+    Rmem,
+    Wmem,
+    Call,
+    Ret,
+    Out,
+    In,
+    Noop,
+}
 
 #[derive(Copy,Clone,Debug)]
 struct Value(i32);
@@ -51,13 +74,16 @@ fn run(input: &str) -> Outcome {
 fn next(Offset(offset): Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     match get_next_instruction(Offset(offset), ins.clone()) {
         Some(code) => {
-            let outcome = instruction(code, Offset(offset + 1), ins.clone(), regs, stack);
+            let outcome =
+                run_instruction(code, Offset(offset + 1), ins.clone(), regs, stack);
 
             match outcome {
                 Outcome::Continue(new_offset, new_regs, new_stack) =>
                     next(new_offset, ins, new_regs, new_stack),
+
                 Outcome::Success =>
                     Outcome::Success,
+
                 Outcome::Fail =>
                     Outcome::Fail,
             }
@@ -66,41 +92,64 @@ fn next(Offset(offset): Offset, ins: Instructions, regs: Registers, stack: Stack
     }
 }
 
-fn get_next_instruction(Offset(offset): Offset, ins: Instructions) -> Option<InstructionCode> {
+fn get_next_instruction(Offset(offset): Offset, ins: Instructions) -> Option<Ins> {
     match ins.get(offset) {
         Some(a) => {
             let InstructionValue(code) = *a;
-            Some(InstructionCode(code))
+            match code {
+                0 => Some(Ins::Stop),
+                1 => Some(Ins::Set),
+                2 => Some(Ins::Push),
+                3 => Some(Ins::Pop),
+                4 => Some(Ins::Eq),
+                5 => Some(Ins::Gt),
+                6 => Some(Ins::Jmp),
+                7 => Some(Ins::Jt),
+                8 => Some(Ins::Jf),
+                9 => Some(Ins::Add),
+                10 =>Some(Ins::Mult),
+                11 => Some(Ins::Store),
+                12 => Some(Ins::And),
+                13 => Some(Ins::Or),
+                14 => Some(Ins::Not),
+                15 => Some(Ins::Rmem),
+                16 => Some(Ins::Wmem),
+                17 => Some(Ins::Call),
+                18 => Some(Ins::Ret),
+                19 => Some(Ins::Out),
+                20 => Some(Ins::In),
+                21 => Some(Ins::Noop),
+                _ => None,
+            }
         },
         None => None,
     }
 }
 
-fn instruction(InstructionCode(code): InstructionCode, offset: Offset, ins: Instructions, r: Registers, s: Stack) -> Outcome {
+fn run_instruction(code: Ins, offset: Offset, ins: Instructions, r: Registers, s: Stack) -> Outcome {
     match code {
-        0 => i_stop(),
-        1 => i_set(offset, ins, r, s),
-        2 => i_push(offset, ins, r, s),
-        3 => i_pop(offset, ins, r, s),
-        4 => i_eq(offset, ins, r, s),
-        5 => i_gt(offset, ins, r, s),
-        6 => i_jmp(offset, ins, r, s),
-        7 => i_jt(offset, ins, r, s),
-        8 => i_jf(offset, ins, r, s),
-        9 => i_add(offset, ins, r, s),
-        10 => i_mult(offset, ins, r, s),
-        11 => i_store(offset, ins, r, s),
-        12 => i_and(offset, ins, r, s),
-        13 => i_or(offset, ins, r, s),
-        14 => i_not(offset, ins, r, s),
-        15 => i_rmem(offset, ins, r, s),
-        16 => i_wmem(offset, ins, r, s),
-        17 => i_call(offset, ins, r, s),
-        18 => i_ret(offset, ins, r, s),
-        19 => i_out(offset, ins, r, s),
-        20 => i_in(offset, ins, r, s),
-        21 => i_noop(offset, ins, r, s),
-        _ => Outcome::Fail,
+        Ins::Stop => i_stop(),
+        Ins::Set => i_set(offset, ins, r, s),
+        Ins::Push => i_push(offset, ins, r, s),
+        Ins::Pop => i_pop(offset, ins, r, s),
+        Ins::Eq => i_eq(offset, ins, r, s),
+        Ins::Gt => i_gt(offset, ins, r, s),
+        Ins::Jmp => i_jmp(offset, ins, r, s),
+        Ins::Jt => i_jt(offset, ins, r, s),
+        Ins::Jf => i_jf(offset, ins, r, s),
+        Ins::Add => i_add(offset, ins, r, s),
+        Ins::Mult => i_mult(offset, ins, r, s),
+        Ins::Store => i_store(offset, ins, r, s),
+        Ins::And => i_and(offset, ins, r, s),
+        Ins::Or => i_or(offset, ins, r, s),
+        Ins::Not => i_not(offset, ins, r, s),
+        Ins::Rmem => i_rmem(offset, ins, r, s),
+        Ins::Wmem => i_wmem(offset, ins, r, s),
+        Ins::Call => i_call(offset, ins, r, s),
+        Ins::Ret => i_ret(offset, ins, r, s),
+        Ins::Out => i_out(offset, ins, r, s),
+        Ins::In => i_in(offset, ins, r, s),
+        Ins::Noop => i_noop(offset, ins, r, s),
     }
 }
 
