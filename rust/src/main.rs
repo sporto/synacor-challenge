@@ -217,47 +217,19 @@ fn i_pop(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Ou
 // eq: 4 a b c
 //   set <a> to 1 if <b> is equal to <c>; set it to 0 otherwise
 fn i_eq(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-        get_3(offset, ins.clone())
-        .and_then(|(new_offset, a, b, c)|
-            register_pos(a).map(|reg_pos| {
-                    let Value(b_val) = raw_to_value(b, regs.clone());
-                    let Value(c_val) = raw_to_value(c, regs.clone());
-
-                    let value = if b_val == c_val {
-                        Value(1)
-                    } else {
-                        Value(0)
-                    };
-
-                    let new_registers = set_value_in_register(regs, reg_pos, value);
-
-                    Outcome::Continue(new_offset, new_registers, stack)
-                }
-            )
-        ).unwrap_or(Outcome::Fail)
+    fn op(b: i32, c: i32)  -> i32 {
+        if b == c { 1 } else { 0 }
+    }
+    store_with_operation(offset, ins, regs, stack, &op)
 }
 
 // gt: 5 a b c
 //   set <a> to 1 if <b> is greater than <c>; set it to 0 otherwise
 fn i_gt(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    get_3(offset, ins.clone())
-    .and_then(|(new_offset, a, b, c)|
-        register_pos(a).map(|reg_pos| {
-                let Value(b_val) = raw_to_value(b, regs.clone());
-                let Value(c_val) = raw_to_value(c, regs.clone());
-
-                let value = if b_val > c_val {
-                    Value(1)
-                } else {
-                    Value(0)
-                };
-
-                let new_registers = set_value_in_register(regs, reg_pos, value);
-
-                Outcome::Continue(new_offset, new_registers, stack)
-            }
-        )
-    ).unwrap_or(Outcome::Fail)
+    fn op(b: i32, c: i32)  -> i32 {
+        if b > c { 1 } else { 0 }
+    }
+    store_with_operation(offset, ins, regs, stack, &op)
 }
 // jmp: 6 a
 //   jump to <a>
@@ -311,60 +283,29 @@ fn i_jf(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Out
 // # add: 9 a b c
 // #   assign into <a> the sum of <b> and <c> (modulo 32768)
 fn i_add(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    match get_3(offset, ins.clone()) {
-        Some((new_offset, a, b, c)) => {
-            match register_pos(a) {
-                Some(reg_pos) => {
-                    let Value(b_val) = raw_to_value(b, regs.clone());
-                    let Value(c_val) = raw_to_value(c, regs.clone());
-                    let sum = (b_val + c_val) % MODULO;
-                    // println!("sum {:?}", b_val);
-
-                    let new_registers = set_value_in_register(regs, reg_pos, Value(sum));
-
-                    Outcome::Continue(new_offset, new_registers, stack)
-                },
-                None => Outcome::Fail,
-            }
-        },
-        _ => Outcome::Fail,
+    fn op(b: i32, c: i32)  -> i32 {
+        (b + c) % MODULO
     }
+    store_with_operation(offset, ins, regs, stack, &op)
 }
 
 // mult: 10 a b c
 //   store into <a> the product of <b> and <c> (modulo 32768)
 fn i_mult(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    get_3(offset, ins.clone())
-    .and_then(|(new_offset, a, b, c)|
-        register_pos(a).map(|reg_pos| {
-            let Value(bval) = raw_to_value(b, regs.clone());
-            let Value(cval) = raw_to_value(c, regs.clone());
-
-            let product = (bval * cval) % MODULO;
-
-            let new_registers = set_value_in_register(regs, reg_pos, Value(product));
-
-            Outcome::Continue(new_offset, new_registers, stack)
-        })
-    ).unwrap_or(Outcome::Fail)
+    fn op(b: i32, c: i32)  -> i32 {
+        (b * c) % MODULO
+    }
+    store_with_operation(offset, ins, regs, stack, &op)
 }
 // mod: 11 a b c
 //   store into <a> the remainder of <b> divided by <c>
 fn i_mod(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    get_3(offset, ins.clone())
-    .and_then(|(new_offset, a, b, c)|
-        register_pos(a).map(|reg_pos| {
-            let Value(bval) = raw_to_value(b, regs.clone());
-            let Value(cval) = raw_to_value(c, regs.clone());
-
-            let value = bval % cval;
-
-            let new_registers = set_value_in_register(regs, reg_pos, Value(value));
-
-            Outcome::Continue(new_offset, new_registers, stack)
-        })
-    ).unwrap_or(Outcome::Fail)
+    fn op(b: i32, c: i32)  -> i32 {
+        b % c
+    }
+    store_with_operation(offset, ins, regs, stack, &op)
 }
+
 // and: 12 a b c
 //   stores into <a> the bitwise and of <b> and <c>
 fn i_and(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
@@ -425,6 +366,29 @@ fn i_in(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Out
 //   no operation
 fn i_noop(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     Outcome::Fail
+}
+
+fn store_with_operation(
+        offset: Offset,
+        ins: Instructions,
+        regs: Registers,
+        stack: Stack,
+        operation: &Fn(i32, i32) -> i32
+    ) -> Outcome {
+
+    get_3(offset, ins.clone())
+    .and_then(|(new_offset, a, b, c)|
+        register_pos(a).map(|reg_pos| {
+            let Value(bval) = raw_to_value(b, regs.clone());
+            let Value(cval) = raw_to_value(c, regs.clone());
+
+            let value = operation(bval, cval);
+
+            let new_registers = set_value_in_register(regs, reg_pos, Value(value));
+
+            Outcome::Continue(new_offset, new_registers, stack)
+        })
+    ).unwrap_or(Outcome::Fail)
 }
 
 fn raw_to_value(InstructionValue(n): InstructionValue, regs: Registers) -> Value {
