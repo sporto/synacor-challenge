@@ -21,6 +21,7 @@ type Stack = Vector<Value>;
 enum Outcome {
     Success,
     Fail,
+    Continue(Instructions, Registers, Stack),
 }
 
 fn main() {
@@ -49,7 +50,16 @@ fn next(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     match ins.pop_front() {
         Some((code_arc, rest)) => {
             let InstructionValue(code) = *code_arc;
-            instruction(InstructionCode(code), rest, regs, stack)
+            let outcome = instruction(InstructionCode(code), rest, regs, stack);
+
+            match outcome {
+                Outcome::Continue(new_ins, new_regs, new_stack) =>
+                    next(new_ins, new_regs, new_stack),
+                Outcome::Success =>
+                    Outcome::Success,
+                Outcome::Fail =>
+                    Outcome::Fail,
+            }
         },
         None => Outcome::Success,
     }
@@ -98,7 +108,7 @@ fn i_set(ins: Instructions, regs: Registers, stack: Stack)  -> Outcome {
                 Some(reg_pos) => {
                     let value = raw_to_value(b, regs.clone());
                     let new_registers = set_value_in_register(regs, reg_pos, value);
-                    next(rest, new_registers, stack)
+                    Outcome::Continue(rest, new_registers, stack)
                 },
                 None => Outcome::Fail,
             }
@@ -115,7 +125,7 @@ fn i_push(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
             let value = raw_to_value(a, regs.clone());
             let new_stack = stack.push_front(value);
 
-            next(rest, regs, new_stack)
+            Outcome::Continue(rest, regs, new_stack)
         },
         None => Outcome::Fail,
     }
@@ -131,7 +141,7 @@ fn i_pop(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
                     match register_pos(a) {
                         Some(reg_pos) => {
                             let new_registers = set_value_in_register(regs, reg_pos, value);
-                            next(rest, new_registers, new_stack)
+                            Outcome::Continue(rest, new_registers, new_stack)
                         },
                         None => Outcome::Fail,
                     }
@@ -181,7 +191,7 @@ fn i_add(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
 
                     let new_registers = set_value_in_register(regs, reg_pos, Value(sum));
 
-                    next(rest, new_registers, stack)
+                    Outcome::Continue(rest, new_registers, stack)
                 },
                 None => Outcome::Fail,
             }
@@ -245,7 +255,7 @@ fn i_out(ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
                 Some(c) => print!("{:?}", c),
                 None => (),
             }
-            next(rest, regs, stack)
+            Outcome::Continue(rest, regs, stack)
         }
         None => Outcome::Fail,
     }
