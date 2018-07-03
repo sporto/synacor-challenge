@@ -260,7 +260,13 @@ fn i_gt(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Out
 // jmp: 6 a
 //   jump to <a>
 fn i_jmp(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    Outcome::Fail
+    get_1(offset, ins.clone())
+    .map(|(_, a)|
+        {
+            let Value(a_val) = raw_to_value(a, regs.clone());
+            Outcome::Continue(Offset(a_val as usize), regs, stack)
+        }
+    ).unwrap_or(Outcome::Fail)
 }
 // jt: 7 a b
 //   if <a> is nonzero, jump to <b>
