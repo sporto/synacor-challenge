@@ -3,6 +3,8 @@ extern crate ux;
 
 
 // 32767 ==> 0b111111111111111 (15 bits)
+// u16::max_value() ==> 65535
+// i16::max_value() ==> 32767
 
 use im::Vector;
 use im::HashMap;
@@ -335,11 +337,12 @@ fn i_not(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Ou
         register_pos(a).map(|reg_pos| {
             let Value(bval) = raw_to_value(b, regs.clone());
 
-            // let value = !ux::u15(bval);
-            let value = bval;
+            // let value15 = u15::from(bval); 
+            let value = !bval;
+            // let value = bval;
             // TODO: Need to convert this to 15 bits, then not and back to int
 
-            let new_registers = set_value_in_register(regs, reg_pos, Value(value));
+            let new_registers = set_value_in_register(regs, reg_pos, Value(value as u16));
 
             Outcome::Continue(new_offset, new_registers, stack)
         })
@@ -348,12 +351,30 @@ fn i_not(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Ou
 // rmem: 15 a b
 //   read memory at address <b> and write it to <a>
 fn i_rmem(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    Outcome::Fail
+    get_2(offset, ins.clone())
+    .and_then(|(new_offset, a, b)|
+        register_pos(a)
+        .map(|reg_pos_a| {
+            let bval = raw_to_value(b, regs.clone());
+            let new_registers = set_value_in_register(regs, reg_pos_a, bval);
+
+            Outcome::Continue(new_offset, new_registers, stack)
+        })
+    ).unwrap_or(Outcome::Fail)
 }
 // wmem: 16 a b
 //   write the value from <b> into memory at address <a>
 fn i_wmem(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    Outcome::Fail
+    get_2(offset, ins.clone())
+    .and_then(|(new_offset, a, b)|
+        register_pos(a)
+        .map(|reg_pos_a| {
+            let bval = raw_to_value(b, regs.clone());
+            let new_registers = set_value_in_register(regs, reg_pos_a, bval);
+
+            Outcome::Continue(new_offset, new_registers, stack)
+        })
+    ).unwrap_or(Outcome::Fail)
 }
 // call: 17 a
 //   write the address of the next instruction to the stack and jump to <a>
@@ -428,8 +449,11 @@ fn raw_to_value(InstructionValue(n): InstructionValue, regs: Registers) -> Value
 }
 
 fn register_pos(InstructionValue(value): InstructionValue) -> Option<RegisterPos> {
-    let pos = value - 32768;
-    if pos >= 0 && pos <= 7 {
+    let first = 32768;
+    let last = 32775;
+
+    if value >= first && value <= last {
+        let pos = value - first;
         Some(RegisterPos(pos))
     } else {
         None
