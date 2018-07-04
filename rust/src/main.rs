@@ -1,8 +1,13 @@
 extern crate im;
+extern crate ux;
+
+
+// 32767 ==> 0b111111111111111 (15 bits)
 
 use im::Vector;
 use im::HashMap;
 use std::char;
+use ux::u15;
 
 const MODULO: i32 = 32768;
 
@@ -309,17 +314,35 @@ fn i_mod(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Ou
 // and: 12 a b c
 //   stores into <a> the bitwise and of <b> and <c>
 fn i_and(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    Outcome::Fail
+    fn op(b: i32, c: i32)  -> i32 {
+        b & c
+    }
+    store_with_operation(offset, ins, regs, stack, &op)
 }
 // or: 13 a b c
 //   stores into <a> the bitwise or of <b> and <c>
 fn i_or(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    Outcome::Fail
+    fn op(b: i32, c: i32)  -> i32 {
+        b | c
+    }
+    store_with_operation(offset, ins, regs, stack, &op)
 }
 // not: 14 a b
 //   stores 15-bit bitwise inverse of <b> in <a>
 fn i_not(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    Outcome::Fail
+    get_2(offset, ins.clone())
+    .and_then(|(new_offset, a, b)|
+        register_pos(a).map(|reg_pos| {
+            let Value(bval) = raw_to_value(b, regs.clone());
+
+            let value = !bval;
+            // TODO: Need to convert this to 15 bits, then not and back to int
+
+            let new_registers = set_value_in_register(regs, reg_pos, Value(value));
+
+            Outcome::Continue(new_offset, new_registers, stack)
+        })
+    ).unwrap_or(Outcome::Fail)
 }
 // rmem: 15 a b
 //   read memory at address <b> and write it to <a>
