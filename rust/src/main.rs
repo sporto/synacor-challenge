@@ -9,7 +9,7 @@ use im::HashMap;
 use std::char;
 use ux::u15;
 
-const MODULO: i32 = 32768;
+const MODULO: u16 = 32768;
 
 enum Ins {
     Stop,
@@ -37,17 +37,17 @@ enum Ins {
 }
 
 #[derive(Copy,Clone,Debug)]
-struct Value(i32);
+struct Value(u16);
 
 #[derive(Copy,Clone,Debug)]
-struct InstructionValue(i32);
+struct InstructionValue(u16);
 
-struct RegisterPos(i32);
+struct RegisterPos(u16);
 
 struct Offset(usize);
 
 type Instructions = Vector<InstructionValue>;
-type Registers = HashMap<i32, Value>;
+type Registers = HashMap<u16, Value>;
 type Stack = Vector<Value>;
 
 enum Outcome {
@@ -59,7 +59,7 @@ enum Outcome {
 fn main() {
     let input = "9,32768,32769,4,19,32768";
     run(input);
-    // println!("{:?}", i32::max_value());
+    // println!("{:?}", u16::max_value());
 }
 
 fn run(input: &str) -> Outcome {
@@ -67,7 +67,7 @@ fn run(input: &str) -> Outcome {
 
     let vec = input
         .split(",")
-        .map(|c| c.parse::<i32>() )
+        .map(|c| c.parse::<u16>() )
         .flat_map(|e| e)
         .map(|v| InstructionValue(v))
         .collect::<Vec<InstructionValue>>();
@@ -222,7 +222,7 @@ fn i_pop(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Ou
 // eq: 4 a b c
 //   set <a> to 1 if <b> is equal to <c>; set it to 0 otherwise
 fn i_eq(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    fn op(b: i32, c: i32)  -> i32 {
+    fn op(b: u16, c: u16) -> u16 {
         if b == c { 1 } else { 0 }
     }
     store_with_operation(offset, ins, regs, stack, &op)
@@ -231,7 +231,7 @@ fn i_eq(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Out
 // gt: 5 a b c
 //   set <a> to 1 if <b> is greater than <c>; set it to 0 otherwise
 fn i_gt(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    fn op(b: i32, c: i32)  -> i32 {
+    fn op(b: u16, c: u16) -> u16 {
         if b > c { 1 } else { 0 }
     }
     store_with_operation(offset, ins, regs, stack, &op)
@@ -288,7 +288,7 @@ fn i_jf(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Out
 // # add: 9 a b c
 // #   assign into <a> the sum of <b> and <c> (modulo 32768)
 fn i_add(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    fn op(b: i32, c: i32)  -> i32 {
+    fn op(b: u16, c: u16) -> u16 {
         (b + c) % MODULO
     }
     store_with_operation(offset, ins, regs, stack, &op)
@@ -297,7 +297,7 @@ fn i_add(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Ou
 // mult: 10 a b c
 //   store into <a> the product of <b> and <c> (modulo 32768)
 fn i_mult(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    fn op(b: i32, c: i32)  -> i32 {
+    fn op(b: u16, c: u16) -> u16 {
         (b * c) % MODULO
     }
     store_with_operation(offset, ins, regs, stack, &op)
@@ -305,7 +305,7 @@ fn i_mult(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> O
 // mod: 11 a b c
 //   store into <a> the remainder of <b> divided by <c>
 fn i_mod(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    fn op(b: i32, c: i32)  -> i32 {
+    fn op(b: u16, c: u16) -> u16 {
         b % c
     }
     store_with_operation(offset, ins, regs, stack, &op)
@@ -314,7 +314,7 @@ fn i_mod(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Ou
 // and: 12 a b c
 //   stores into <a> the bitwise and of <b> and <c>
 fn i_and(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    fn op(b: i32, c: i32)  -> i32 {
+    fn op(b: u16, c: u16) -> u16 {
         b & c
     }
     store_with_operation(offset, ins, regs, stack, &op)
@@ -322,7 +322,7 @@ fn i_and(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Ou
 // or: 13 a b c
 //   stores into <a> the bitwise or of <b> and <c>
 fn i_or(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    fn op(b: i32, c: i32)  -> i32 {
+    fn op(b: u16, c: u16) -> u16 {
         b | c
     }
     store_with_operation(offset, ins, regs, stack, &op)
@@ -335,7 +335,8 @@ fn i_not(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Ou
         register_pos(a).map(|reg_pos| {
             let Value(bval) = raw_to_value(b, regs.clone());
 
-            let value = !bval;
+            // let value = !ux::u15(bval);
+            let value = bval;
             // TODO: Need to convert this to 15 bits, then not and back to int
 
             let new_registers = set_value_in_register(regs, reg_pos, Value(value));
@@ -396,7 +397,7 @@ fn store_with_operation(
         ins: Instructions,
         regs: Registers,
         stack: Stack,
-        operation: &Fn(i32, i32) -> i32
+        operation: &Fn(u16, u16) -> u16
     ) -> Outcome {
 
     get_3(offset, ins.clone())
