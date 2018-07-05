@@ -352,34 +352,41 @@ fn i_not(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Ou
 //   read memory at address <b> and write it to <a>
 fn i_rmem(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     get_2(offset, ins.clone())
-    .and_then(|(new_offset, a, b)|
-        register_pos(a)
-        .map(|reg_pos_a| {
-            let bval = raw_to_value(b, regs.clone());
-            let new_registers = set_value_in_register(regs, reg_pos_a, bval);
-
-            Outcome::Continue(new_offset, new_registers, stack)
-        })
-    ).unwrap_or(Outcome::Fail)
+    .map(|(new_offset, a, b)| {
+        let bval = raw_to_value(b, regs.clone());
+        store_and_continue(
+            a,
+            bval,
+            new_offset,
+            regs,
+            stack,
+        )
+    }).unwrap_or(Outcome::Fail)
 }
 // wmem: 16 a b
 //   write the value from <b> into memory at address <a>
 fn i_wmem(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
     get_2(offset, ins.clone())
-    .and_then(|(new_offset, a, b)|
-        register_pos(a)
-        .map(|reg_pos_a| {
-            let bval = raw_to_value(b, regs.clone());
-            let new_registers = set_value_in_register(regs, reg_pos_a, bval);
-
-            Outcome::Continue(new_offset, new_registers, stack)
-        })
-    ).unwrap_or(Outcome::Fail)
+    .map(|(new_offset, a, b)| {
+        let bval = raw_to_value(b, regs.clone());
+        store_and_continue(
+            a,
+            bval,
+            new_offset,
+            regs,
+            stack,
+        )
+    }).unwrap_or(Outcome::Fail)
 }
 // call: 17 a
 //   write the address of the next instruction to the stack and jump to <a>
 fn i_call(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    Outcome::Fail
+    get_2(offset, ins)
+    .map(|(new_offset, a, InstructionValue(b))| {
+        let new_stack = stack.push_front(Value(b));
+        let Value(a_val) = raw_to_value(a, regs.clone());
+        Outcome::Continue(Offset(a_val as usize), regs, new_stack)
+    }).unwrap_or(Outcome::Fail)
 }
 // ret: 18
 //   remove the top element from the stack and jump to it; empty stack = halt
@@ -434,6 +441,14 @@ fn store_with_operation(
             Outcome::Continue(new_offset, new_registers, stack)
         })
     ).unwrap_or(Outcome::Fail)
+}
+
+fn store_and_continue(raw_reg_pos: InstructionValue, value: Value, offset: Offset, regs: Registers, stack: Stack) -> Outcome{
+    register_pos(raw_reg_pos)
+        .map(|reg_pos| {
+            let new_registers = set_value_in_register(regs, reg_pos, value);
+            Outcome::Continue(offset, new_registers, stack)
+        }).unwrap_or(Outcome::Fail)
 }
 
 fn raw_to_value(InstructionValue(n): InstructionValue, regs: Registers) -> Value {
