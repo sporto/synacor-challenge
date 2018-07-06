@@ -88,32 +88,151 @@ fn parse_input(input: &str) -> Vec<u16> {
 }
 
 fn parse_program(ins: Vec<u16>) -> Option<Program> {
-	let offset = 0;
 	let rest = Vector::from(ins);
 	let program = Vector::new();
 	
-	parse_next_instruction(program, rest )
+	parse_next_instruction(program, rest)
+		.map(|(new_program, _)| new_program)
 }
 
-fn parse_next_instruction(program: Program, ins: Vector<u16>) -> Option<Program> {
-	match get_1(ins) {
-		Some((a, rest)) => {
-			match a {
+fn parse_instructions(program: Program, ins: Vector<u16>) -> Option<(Program, Vector<u16>)> {
+	parse_next_instruction(program, ins)
+		.and_then(|(next_program, next_ins)| parse_instructions(next_program, next_ins) )
+}
+
+fn parse_next_instruction(program: Program, ins: Vector<u16>) -> Option<(Program, Vector<u16>)> {
+	match get_1(ins.clone()) {
+		Some((o, rest)) => {
+			match o {
 				0 => {
-					let new_program = program.push_back(Op::Stop);
-					parse_next_instruction(new_program, rest)
+					Some((program.push_back(Op::Stop), rest))
 				},
 				1 => {
-					get_2(rest)
-					.and_then(|(b, c, rest2)| {
-						let op = Op::Set(b, c);
-						let new_program = program.push_back(op);
-						parse_next_instruction(new_program, rest2)
+					get_2(rest).map(|(a, b, rest2)| {
+						let op = Op::Set(a, b);
+						(program.push_back(op), rest2)
 					})
-				}
+				},
+				2 => {
+					get_1(rest).map(|(a, rest2)| {
+						let op = Op::Push(a);
+						(program.push_back(op), rest2)
+					})
+				},
+				3 => {
+					get_1(rest).map(|(a, rest2)| {
+						let op = Op::Pop(a);
+						(program.push_back(op), rest2)
+					})
+				},
+				4 => {
+					get_3(rest).map(|(a, b, c, rest2)| {
+						let op = Op::Eq(a, b, c);
+						(program.push_back(op), rest2)
+					})
+				},
+				5 => {
+					get_3(rest).map(|(a, b, c, rest2)| {
+						let op = Op::Gt(a, b, c);
+						(program.push_back(op), rest2)
+					})
+				},
+				6 => {
+					get_1(rest).map(|(a, rest2)| {
+						let op = Op::Jmp(a);
+						(program.push_back(op), rest2)
+					})
+				},
+				7 => {
+					get_2(rest).map(|(a, b, rest2)| {
+						let op = Op::Jt(a, b);
+						(program.push_back(op), rest2)
+					})
+				},
+				8 => {
+					get_2(rest).map(|(a, b, rest2)| {
+						let op = Op::Jf(a, b);
+						(program.push_back(op), rest2)
+					})
+				},
+				9 => {
+					get_3(rest).map(|(a, b, c, rest2)| {
+						let op = Op::Add(a, b, c);
+						(program.push_back(op), rest2)
+					})
+				},
+				10 => {
+					get_3(rest).map(|(a, b, c, rest2)| {
+						let op = Op::Mult(a, b, c);
+						(program.push_back(op), rest2)
+					})
+				},
+				11 => {
+					get_3(rest).map(|(a, b, c, rest2)| {
+						let op = Op::Mod(a, b, c);
+						(program.push_back(op), rest2)
+					})
+				},
+				12 => {
+					get_3(rest).map(|(a, b, c, rest2)| {
+						let op = Op::And(a, b, c);
+						(program.push_back(op), rest2)
+					})
+				},
+				13 => {
+					get_3(rest).map(|(a, b, c, rest2)| {
+						let op = Op::Or(a, b, c);
+						(program.push_back(op), rest2)
+					})
+				},
+				14 => {
+					get_2(rest).map(|(a, b, rest2)| {
+						let op = Op::Not(a, b);
+						(program.push_back(op), rest2)
+					})
+				},
+				15 => {
+					get_2(rest).map(|(a, b, rest2)| {
+						let op = Op::Rmem(a, b);
+						(program.push_back(op), rest2)
+					})
+				},
+				16 => {
+					get_2(rest).map(|(a, b, rest2)| {
+						let op = Op::Wmem(a, b);
+						(program.push_back(op), rest2)
+					})
+				},
+				17 => {
+					get_1(rest).map(|(a, rest2)| {
+						let op = Op::Call(a);
+						(program.push_back(op), rest2)
+					})
+				},
+				18 => {
+					get_1(rest).map(|(a, rest2)| {
+						let op = Op::Ret(a);
+						(program.push_back(op), rest2)
+					})
+				},
+				19 => {
+					get_1(rest).map(|(a, rest2)| {
+						let op = Op::Out(a);
+						(program.push_back(op), rest2)
+					})
+				},
+				20 => {
+					get_1(rest).map(|(a, rest2)| {
+						let op = Op::In(a);
+						(program.push_back(op), rest2)
+					})
+				},
+				21 => {
+					Some((program.push_back(Op::Noop), rest))
+				},
 				_ => None,
 			}
 		},
-		None => Some(program),
+		None => Some((program, ins)),
 	}
 }
