@@ -381,9 +381,9 @@ fn i_wmem(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> O
 // call: 17 a
 //   write the address of the next instruction to the stack and jump to <a>
 fn i_call(offset: Offset, ins: Instructions, regs: Registers, stack: Stack) -> Outcome {
-    get_2(offset, ins)
-    .map(|(new_offset, a, InstructionValue(b))| {
-        let new_stack = stack.push_front(Value(b));
+    get_1(offset, ins)
+    .map(|(Offset(new_offset), a)| {
+        let new_stack = stack.push_front(Value(new_offset as u16));
         let Value(a_val) = raw_to_value(a, regs.clone());
         Outcome::Continue(Offset(a_val as usize), regs, new_stack)
     }).unwrap_or(Outcome::Fail)
