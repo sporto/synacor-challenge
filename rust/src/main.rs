@@ -7,11 +7,13 @@ use std::char;
 type Registers = HashMap<u8, u16>;
 type Program = Vector<Op>;
 
+#[derive(Debug)]
 enum Out {
 	FailedToParse,
 	Success,
 }
 
+#[derive(Debug)]
 enum Op {
 	Stop,
 	Set(u16, u16),
@@ -71,12 +73,13 @@ fn main() {
 	let input = "9,32768,32769,4,19,32768";
 
 	let regs: Registers = HashMap::new();
-    // println!("{:?}", u16::max_value());
 
 	let raw = parse_input(input);
 
-	let result = parse_program(raw)
-		.map(|program| Out::Success ).unwrap_or(Out::FailedToParse);
+	let result = parse_program(raw);
+		// .map(|program| Out::Success ).unwrap_or(Out::FailedToParse);
+
+	println!("{:?}", result);
 }
 
 fn parse_input(input: &str) -> Vec<u16> {
@@ -91,18 +94,25 @@ fn parse_program(ins: Vec<u16>) -> Option<Program> {
 	let rest = Vector::from(ins);
 	let program = Vector::new();
 	
-	parse_next_instruction(program, rest)
-		.map(|(new_program, _)| new_program)
+	parse_instructions(program, rest)
 }
 
-fn parse_instructions(program: Program, ins: Vector<u16>) -> Option<(Program, Vector<u16>)> {
+fn parse_instructions(program: Program, ins: Vector<u16>) -> Option<Program> {
 	parse_next_instruction(program, ins)
-		.and_then(|(next_program, next_ins)| parse_instructions(next_program, next_ins) )
+		.and_then(|(next_program, next_ins)|
+			if next_ins.is_empty() {
+				Some(next_program)
+			} else {
+				parse_instructions(next_program, next_ins)
+			}
+	)
 }
 
 fn parse_next_instruction(program: Program, ins: Vector<u16>) -> Option<(Program, Vector<u16>)> {
 	match get_1(ins.clone()) {
 		Some((o, rest)) => {
+			// println!("{:?}", o);
+			// println!("{:?}", rest);
 			match o {
 				0 => {
 					Some((program.push_back(Op::Stop), rest))
