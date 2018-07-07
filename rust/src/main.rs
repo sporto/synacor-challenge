@@ -22,7 +22,7 @@ struct Value(u16);
 
 #[derive(Debug)]
 enum Out {
-	Continue(Registers, Stack),
+	Continue(usize, Registers, Stack),
 	FailedToParse,
 	Halted,
 	InvalidRegister,
@@ -273,10 +273,10 @@ fn run_program(program: Program) -> Out {
 fn run_next_operation(offset: usize, program: Program, regs: Registers, stack: Stack) -> Out {
 	match program.get(offset) {
 		Some(op) => {
-			let out = run_operation(*op, regs, stack);
+			let out = run_operation(*op, offset, regs, stack);
 			match out {
-				Out::Continue(new_regs, new_stack) =>
-					run_next_operation(offset + 1, program, new_regs, new_stack),
+				Out::Continue(new_offset, new_regs, new_stack) =>
+					run_next_operation(new_offset, program, new_regs, new_stack),
 				_ =>
 					out,
 			}
@@ -285,30 +285,30 @@ fn run_next_operation(offset: usize, program: Program, regs: Registers, stack: S
 	}
 }
 
-fn run_operation(op: Op, regs: Registers, stack: Stack) -> Out {
+fn run_operation(op: Op, offset: usize, regs: Registers, stack: Stack) -> Out {
 	match op {
 		Op::Stop => Out::Halted,
-		Op::Set(a, b) => run_set(regs, stack, a, b),
-		Op::Push(a) => run_push(regs, stack, a),
-		Op::Pop(a) => run_pop(regs, stack, a),
-		Op::Eq(a, b, c) => run_eq(regs, stack, a, b, c),
-		Op::Gt(a, b, c) => run_gt(regs, stack, a, b, c),
-		Op::Jmp(a) => run_jmp(regs, stack, a),
-		Op::Jt(a, b) => run_jt(regs, stack, a, b),
-		Op::Jf(a, b) => run_jf(regs, stack, a, b),
-		Op::Add(a, b, c) => run_add(regs, stack, a, b, c),
-		Op::Mult(a, b, c) => run_mult(regs, stack, a, b, c),
-		Op::Mod(a, b, c) => run_mod(regs, stack, a, b, c),
-		Op::And(a, b, c) => run_and(regs, stack, a, b, c),
-		Op::Or(a, b, c) => run_or(regs, stack, a, b, c),
-		Op::Not(a, b) => run_not(regs, stack, a, b),
-		Op::Rmem(a, b) => run_rmem(regs, stack, a, b),
-		Op::Wmem(a, b) => run_wmem(regs, stack, a, b),
-		Op::Call(a) => run_call(regs, stack, a),
-		Op::Ret => run_ret(regs, stack),
-		Op::Out(a) => run_out(regs, stack, a),
-		Op::In(a) => run_in(regs, stack, a),
-		Op::NoOp => Out::Continue(regs, stack),
+		Op::Set(a, b) => run_set(offset, regs, stack, a, b),
+		Op::Push(a) => run_push(offset, regs, stack, a),
+		Op::Pop(a) => run_pop(offset, regs, stack, a),
+		Op::Eq(a, b, c) => run_eq(offset, regs, stack, a, b, c),
+		Op::Gt(a, b, c) => run_gt(offset, regs, stack, a, b, c),
+		Op::Jmp(a) => run_jmp(offset, regs, stack, a),
+		Op::Jt(a, b) => run_jt(offset, regs, stack, a, b),
+		Op::Jf(a, b) => run_jf(offset, regs, stack, a, b),
+		Op::Add(a, b, c) => run_add(offset, regs, stack, a, b, c),
+		Op::Mult(a, b, c) => run_mult(offset, regs, stack, a, b, c),
+		Op::Mod(a, b, c) => run_mod(offset, regs, stack, a, b, c),
+		Op::And(a, b, c) => run_and(offset, regs, stack, a, b, c),
+		Op::Or(a, b, c) => run_or(offset, regs, stack, a, b, c),
+		Op::Not(a, b) => run_not(offset, regs, stack, a, b),
+		Op::Rmem(a, b) => run_rmem(offset, regs, stack, a, b),
+		Op::Wmem(a, b) => run_wmem(offset, regs, stack, a, b),
+		Op::Call(a) => run_call(offset, regs, stack, a),
+		Op::Ret => run_ret(offset, regs, stack),
+		Op::Out(a) => run_out(offset, regs, stack, a),
+		Op::In(a) => run_in(offset, regs, stack, a),
+		Op::NoOp => Out::Continue(offset + 1, regs, stack),
 	}
 }
 
@@ -318,11 +318,11 @@ fn get_value_from_register(RegisterPos(pos): RegisterPos, regs: Registers) -> Op
 		.map(|arc| *arc)
 }
 
-fn set_value_in_register_and_continue(regs: Registers, stack: Stack, reg: RawValue, val: Value) -> Out  {
+fn set_value_in_register_and_continue(offset: usize, regs: Registers, stack: Stack, reg: RawValue, val: Value) -> Out  {
 	register_pos(reg)
 		.map(|RegisterPos(pos)| {
 			let new_registers = regs.insert(pos, val);
-			Out::Continue(new_registers, stack)
+			Out::Continue(offset + 1, new_registers, stack)
 		})
 		.unwrap_or(Out::InvalidRegister)
 }
@@ -348,24 +348,24 @@ fn raw_to_value(RawValue(val): RawValue, regs: Registers) -> Value {
 
 // set: 1 a b
 //   set register <a> to the value of <b>
-fn run_set(regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
+fn run_set(offset: usize, regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
 	let val = raw_to_value(b, regs.clone());
-	set_value_in_register_and_continue(regs, stack, a, val)
+	set_value_in_register_and_continue(offset, regs, stack, a, val)
 }
 
 // push: 2 a
 //   push <a> onto the stack
-fn run_push(regs: Registers, stack: Stack, a: RawValue) -> Out {
+fn run_push(offset: usize, regs: Registers, stack: Stack, a: RawValue) -> Out {
 	let val = raw_to_value(a, regs.clone());
-	Out::Continue(regs, stack.push_front(val))
+	Out::Continue(offset + 1, regs, stack.push_front(val))
 }
 
 // pop: 3 a
 //   remove the top element from the stack and write it into <a>; empty stack = error
-fn run_pop(regs: Registers, stack: Stack, a: RawValue) -> Out {
+fn run_pop(offset: usize, regs: Registers, stack: Stack, a: RawValue) -> Out {
 	match stack.pop_front() {
 		Some((val, new_stack)) => {
-			set_value_in_register_and_continue(regs, new_stack, a, *val)
+			set_value_in_register_and_continue(offset, regs, new_stack, a, *val)
 		},
 		None => Out::Halted,
 	}
@@ -373,109 +373,149 @@ fn run_pop(regs: Registers, stack: Stack, a: RawValue) -> Out {
 
 // eq: 4 a b c
 //   set <a> to 1 if <b> is equal to <c>; set it to 0 otherwise
-fn run_eq(regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
-	Out::Continue(regs, stack)
+fn run_eq(offset: usize, regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
+	let Value(bval) = raw_to_value(b, regs.clone());
+	let Value(cval) = raw_to_value(c, regs.clone());
+	let val = if bval == cval { 1 } else { 0 };
+	set_value_in_register_and_continue(offset, regs, stack, a, Value(val))
 }
 
 // gt: 5 a b c
 //   set <a> to 1 if <b> is greater than <c>; set it to 0 otherwise
-fn run_gt(regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
-	Out::Continue(regs, stack)
+fn run_gt(offset: usize, regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
+	let Value(bval) = raw_to_value(b, regs.clone());
+	let Value(cval) = raw_to_value(c, regs.clone());
+	let val = if bval > cval { 1 } else { 0 };
+	set_value_in_register_and_continue(offset, regs, stack, a, Value(val))
 }
 
 // jmp: 6 a
 //   jump to <a>
-fn run_jmp(regs: Registers, stack: Stack, a: RawValue) -> Out {
-	Out::Continue(regs, stack)
+fn run_jmp(offset: usize, regs: Registers, stack: Stack, a: RawValue) -> Out {
+	let Value(aval) = raw_to_value(a, regs.clone());
+	Out::Continue(aval as usize, regs, stack)
 }
 
 // jt: 7 a b
 //   if <a> is nonzero, jump to <b>
-fn run_jt(regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
-	Out::Continue(regs, stack)
+fn run_jt(offset: usize, regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
+	let Value(aval) = raw_to_value(a, regs.clone());
+	let Value(bval) = raw_to_value(b, regs.clone());
+	let new_offset = if aval == 0 { offset + 1 } else { bval as usize };
+	Out::Continue(new_offset, regs, stack)
 }
 
 // jf: 8 a b
 //   if <a> is zero, jump to <b>
-fn run_jf(regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
-	Out::Continue(regs, stack)
+fn run_jf(offset: usize, regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
+	let Value(aval) = raw_to_value(a, regs.clone());
+	let Value(bval) = raw_to_value(b, regs.clone());
+	let new_offset = if aval == 0 { bval as usize } else { offset + 1 };
+	Out::Continue(new_offset, regs, stack)
 }
 
 // add: 9 a b c
 //   assign into <a> the sum of <b> and <c> (modulo 32768)
-fn run_add(regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
+fn run_add(offset: usize, regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
 	let Value(b_val) = raw_to_value(b, regs.clone());
 	let Value(c_val) = raw_to_value(c, regs.clone());
 	let sum = (b_val + c_val) % MODULO;
-	set_value_in_register_and_continue(regs, stack, a, Value(sum))
+	set_value_in_register_and_continue(offset, regs, stack, a, Value(sum))
 }
 
 // mult: 10 a b c
 //   store into <a> the product of <b> and <c> (modulo 32768)
-fn run_mult(regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
-	Out::Continue(regs, stack)
+fn run_mult(offset: usize, regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
+	let Value(bval) = raw_to_value(b, regs.clone());
+	let Value(cval) = raw_to_value(c, regs.clone());
+	let val = (bval * cval) % MODULO;
+	set_value_in_register_and_continue(offset, regs, stack, a, Value(val))
 }
 
 // mod: 11 a b c
 //   store into <a> the remainder of <b> divided by <c>
-fn run_mod(regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
-	Out::Continue(regs, stack)
+fn run_mod(offset: usize, regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
+	let Value(bval) = raw_to_value(b, regs.clone());
+	let Value(cval) = raw_to_value(c, regs.clone());
+	let val = bval % cval;
+	set_value_in_register_and_continue(offset, regs, stack, a, Value(val))
 }
 
 // and: 12 a b c
 //   stores into <a> the bitwise and of <b> and <c>
-fn run_and(regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
-	Out::Continue(regs, stack)
+fn run_and(offset: usize, regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
+	let Value(bval) = raw_to_value(b, regs.clone());
+	let Value(cval) = raw_to_value(c, regs.clone());
+	let val = bval & cval;
+	set_value_in_register_and_continue(offset, regs, stack, a, Value(val))
 }
 
 // or: 13 a b c
 //   stores into <a> the bitwise or of <b> and <c>
-fn run_or(regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
-	Out::Continue(regs, stack)
+fn run_or(offset: usize, regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
+	let Value(bval) = raw_to_value(b, regs.clone());
+	let Value(cval) = raw_to_value(c, regs.clone());
+	let val = bval | cval;
+	set_value_in_register_and_continue(offset, regs, stack, a, Value(val))
 }
 
 // not: 14 a b
 //   stores 15-bit bitwise inverse of <b> in <a>
-fn run_not(regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
-	Out::Continue(regs, stack)
+fn run_not(offset: usize, regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
+	let Value(bval) = raw_to_value(b, regs.clone());
+	let val = !bval;
+	set_value_in_register_and_continue(offset, regs, stack, a, Value(val))
 }
 
 // rmem: 15 a b
 //   read memory at address <b> and write it to <a>
-fn run_rmem(regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
-	Out::Continue(regs, stack)
+fn run_rmem(offset: usize, regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
+	register_pos(b)
+		.and_then(|reg_pos|
+			get_value_from_register(reg_pos, regs.clone())
+				.map(|bval|
+					set_value_in_register_and_continue(offset, regs, stack, a, bval)
+				)
+		).unwrap_or(Out::Halted)
 }
 
 // wmem: 16 a b
 //   write the value from <b> into memory at address <a>
-fn run_wmem(regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
-	Out::Continue(regs, stack)
+fn run_wmem(offset: usize, regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
+	let bval = raw_to_value(b, regs.clone());
+	set_value_in_register_and_continue(offset, regs, stack, a, bval)
 }
 
 // call: 17 a
 //   write the address of the next instruction to the stack and jump to <a>
-fn run_call(regs: Registers, stack: Stack, a: RawValue) -> Out {
-	Out::Continue(regs, stack)
+fn run_call(offset: usize, regs: Registers, stack: Stack, a: RawValue) -> Out {
+	let new_stack = stack.push_front(Value((offset + 1 )as u16));
+	let Value(aval) = raw_to_value(a, regs.clone());
+	Out::Continue(aval as usize, regs, new_stack)
 }
 
 // ret: 18
 //   remove the top element from the stack and jump to it; empty stack = halt
-fn run_ret(regs: Registers, stack: Stack) -> Out {
-	Out::Continue(regs, stack)
+fn run_ret(offset: usize, regs: Registers, stack: Stack) -> Out {
+	stack.pop_front()
+		.map(|(val, new_stack)| {
+			let Value(new_offset) = *val;
+			Out::Continue(new_offset as usize, regs, new_stack)
+		}).unwrap_or(Out::Halted)
 }
 // out: 19 a
 //   write the character represented by ascii code <a> to the terminal
-fn run_out(regs: Registers, stack: Stack, a: RawValue) -> Out {
+fn run_out(offset: usize, regs: Registers, stack: Stack, a: RawValue) -> Out {
 	let Value(val) = raw_to_value(a, regs.clone());
 	match char::from_u32(val as u32) {
 		Some(c) => print!("{:?}", c),
 		None => (),
 	}
-	Out::Continue(regs, stack)
+	Out::Continue(offset + 1, regs, stack)
 }
 
 // in: 20 a
 //   read a character from the terminal and write its ascii code to <a>; it can be assumed that once input starts, it will continue until a newline is encountered; this means that you can safely read whole lines from the keyboard and trust that they will be fully read
-fn run_in(regs: Registers, stack: Stack, a: RawValue) -> Out {
-	Out::Continue(regs, stack)
+fn run_in(offset: usize, regs: Registers, stack: Stack, a: RawValue) -> Out {
+	Out::Continue(offset + 1, regs, stack)
 }
