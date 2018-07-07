@@ -4,7 +4,9 @@ use im::Vector;
 use im::HashMap;
 use std::char;
 
-type Registers = HashMap<u8, u16>;
+const MODULO: u16 = 32768;
+
+type Registers = HashMap<u8, Value>;
 type Program = Vector<Op>;
 type RawProgram = Vector<RawValue>;
 type Stack = Vector<u16>;
@@ -12,15 +14,22 @@ type Stack = Vector<u16>;
 #[derive(Copy,Clone,Debug)]
 struct RawValue(u16);
 
+#[derive(Copy,Clone,Debug)]
+struct RegisterPos(u8);
+
+#[derive(Copy,Clone,Debug)]
+struct Value(u16);
+
 #[derive(Debug)]
 enum Out {
 	Continue(Registers, Stack),
 	FailedToParse,
 	Halted,
+	InvalidRegister,
 	Success,
 }
 
-#[derive(Debug)]
+#[derive(Copy,Clone,Debug)]
 enum Op {
 	Stop,
 	Set(RawValue, RawValue),
@@ -257,7 +266,23 @@ fn run_program(program: Program) -> Out {
 	let offset = 0;
 	let regs: Registers = HashMap::new();
 	let stack: Stack = Vector::new();
-	Out::Success
+
+	run_next_operation(offset, program, regs, stack)
+}
+
+fn run_next_operation(offset: usize, program: Program, regs: Registers, stack: Stack) -> Out {
+	match program.get(offset) {
+		Some(op) => {
+			let out = run_operation(*op, regs, stack);
+			match out {
+				Out::Continue(new_regs, new_stack) =>
+					run_next_operation(offset + 1, program, new_regs, new_stack),
+				_ =>
+					out,
+			}
+		},
+		None => Out::Success,
+	}
 }
 
 fn run_operation(op: Op, regs: Registers, stack: Stack) -> Out {
@@ -284,6 +309,40 @@ fn run_operation(op: Op, regs: Registers, stack: Stack) -> Out {
 		Op::Out(a) => run_out(regs, stack, a),
 		Op::In(a) => run_in(regs, stack, a),
 		Op::NoOp => Out::Continue(regs, stack),
+	}
+}
+
+fn get_value_from_register(RegisterPos(pos): RegisterPos, regs: Registers) -> Option<Value> {
+	regs
+		.get(&pos)
+		.map(|arc| *arc)
+}
+
+fn set_value_in_register_and_continue(regs: Registers, stack: Stack, reg: RawValue, val: Value) -> Out  {
+	register_pos(reg)
+		.map(|RegisterPos(pos)| {
+			let new_registers = regs.insert(pos, val);
+			Out::Continue(new_registers, stack)
+		})
+		.unwrap_or(Out::InvalidRegister)
+}
+
+fn register_pos(RawValue(value): RawValue) -> Option<RegisterPos> {
+    let first = 32768;
+    let last = 32775;
+
+    if value >= first && value <= last {
+        let pos = value - first;
+        Some(RegisterPos(pos as u8))
+    } else {
+        None
+    }
+}
+
+fn raw_to_value(RawValue(val): RawValue, regs: Registers) -> Value {
+	match register_pos(RawValue(val)) {
+		Some(pos) => get_value_from_register(pos, regs).unwrap_or(Value(0)),
+		None => Value(val),
 	}
 }
 
@@ -338,7 +397,10 @@ fn run_jf(regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
 // add: 9 a b c
 //   assign into <a> the sum of <b> and <c> (modulo 32768)
 fn run_add(regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
-	Out::Continue(regs, stack)
+	let Value(b_val) = raw_to_value(b, regs.clone());
+	let Value(c_val) = raw_to_value(c, regs.clone());
+	let sum = (b_val + c_val) % MODULO;
+	set_value_in_register_and_continue(regs, stack, a, Value(sum))
 }
 
 // mult: 10 a b c
@@ -397,6 +459,11 @@ fn run_ret(regs: Registers, stack: Stack) -> Out {
 // out: 19 a
 //   write the character represented by ascii code <a> to the terminal
 fn run_out(regs: Registers, stack: Stack, a: RawValue) -> Out {
+	let Value(val) = raw_to_value(a, regs.clone());
+	match char::from_u32(val as u32) {
+		Some(c) => print!("{:?}", c),
+		None => (),
+	}
 	Out::Continue(regs, stack)
 }
 
