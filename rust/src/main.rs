@@ -9,7 +9,7 @@ const MODULO: u16 = 32768;
 type Registers = HashMap<u8, Value>;
 type Program = Vector<Op>;
 type RawProgram = Vector<RawValue>;
-type Stack = Vector<u16>;
+type Stack = Vector<Value>;
 
 #[derive(Copy,Clone,Debug)]
 struct RawValue(u16);
@@ -349,19 +349,26 @@ fn raw_to_value(RawValue(val): RawValue, regs: Registers) -> Value {
 // set: 1 a b
 //   set register <a> to the value of <b>
 fn run_set(regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
-	Out::Continue(regs, stack)
+	let val = raw_to_value(b, regs.clone());
+	set_value_in_register_and_continue(regs, stack, a, val)
 }
 
 // push: 2 a
 //   push <a> onto the stack
 fn run_push(regs: Registers, stack: Stack, a: RawValue) -> Out {
-	Out::Continue(regs, stack)
+	let val = raw_to_value(a, regs.clone());
+	Out::Continue(regs, stack.push_front(val))
 }
 
 // pop: 3 a
 //   remove the top element from the stack and write it into <a>; empty stack = error
 fn run_pop(regs: Registers, stack: Stack, a: RawValue) -> Out {
-	Out::Continue(regs, stack)
+	match stack.pop_front() {
+		Some((val, new_stack)) => {
+			set_value_in_register_and_continue(regs, new_stack, a, *val)
+		},
+		None => Out::Halted,
+	}
 }
 
 // eq: 4 a b c
