@@ -6,7 +6,11 @@ use std::char;
 
 type Registers = HashMap<u8, u16>;
 type Program = Vector<Op>;
+type RawProgram = Vector<RawValue>;
 type Stack = Vector<u16>;
+
+#[derive(Copy,Clone,Debug)]
+struct RawValue(u16);
 
 #[derive(Debug)]
 enum Out {
@@ -19,37 +23,37 @@ enum Out {
 #[derive(Debug)]
 enum Op {
 	Stop,
-	Set(u16, u16),
-	Push(u16),
-	Pop(u16),
-	Eq(u16, u16, u16),
-	Gt(u16, u16, u16),
-	Jmp(u16),
-	Jt(u16, u16),
-	Jf(u16, u16),
-	Add(u16, u16, u16),
-	Mult(u16, u16, u16),
-	Mod(u16, u16, u16),
-	And(u16, u16, u16),
-	Or(u16, u16, u16),
-	Not(u16, u16),
-	Rmem(u16, u16),
-	Wmem(u16, u16),
-	Call(u16),
+	Set(RawValue, RawValue),
+	Push(RawValue),
+	Pop(RawValue),
+	Eq(RawValue, RawValue, RawValue),
+	Gt(RawValue, RawValue, RawValue),
+	Jmp(RawValue),
+	Jt(RawValue, RawValue),
+	Jf(RawValue, RawValue),
+	Add(RawValue, RawValue, RawValue),
+	Mult(RawValue, RawValue, RawValue),
+	Mod(RawValue, RawValue, RawValue),
+	And(RawValue, RawValue, RawValue),
+	Or(RawValue, RawValue, RawValue),
+	Not(RawValue, RawValue),
+	Rmem(RawValue, RawValue),
+	Wmem(RawValue, RawValue),
+	Call(RawValue),
 	Ret,
-	Out(u16),
-	In(u16),
+	Out(RawValue),
+	In(RawValue),
 	NoOp,
 }
 
-fn get_1(vec: Vector<u16>) -> Option<(u16, Vector<u16>)> {
+fn get_1(vec: RawProgram) -> Option<(RawValue, RawProgram)> {
 	vec.pop_front()
 		.map(|(a, arest)| {
 			(*a, arest)
 		})
 }
 
-fn get_2(vec: Vector<u16>) -> Option<(u16, u16, Vector<u16>)> {
+fn get_2(vec: RawProgram) -> Option<(RawValue, RawValue, RawProgram)> {
 	vec.pop_front()
 		.and_then(|(a, arest)| {
 			arest.pop_front()
@@ -59,7 +63,7 @@ fn get_2(vec: Vector<u16>) -> Option<(u16, u16, Vector<u16>)> {
 		})
 }
 
-fn get_3(vec: Vector<u16>) -> Option<(u16, u16, u16, Vector<u16>)> {
+fn get_3(vec: RawProgram) -> Option<(RawValue, RawValue, RawValue, RawProgram)> {
 	vec.pop_front()
 		.and_then(|(a, arest)| {
 			arest.pop_front()
@@ -85,22 +89,23 @@ fn main() {
 	println!("{:?}", result);
 }
 
-fn parse_input(input: &str) -> Vec<u16> {
+fn parse_input(input: &str) -> Vec<RawValue> {
 	input
 		.split(",")
 		.map(|c| c.parse::<u16>() )
 		.flat_map(|e| e)
-		.collect::<Vec<u16>>()
+		.map(|v| RawValue(v) )
+		.collect::<Vec<RawValue>>()
 }
 
-fn parse_program(ins: Vec<u16>) -> Option<Program> {
+fn parse_program(ins: Vec<RawValue>) -> Option<Program> {
 	let rest = Vector::from(ins);
 	let program = Vector::new();
 	
 	parse_instructions(program, rest)
 }
 
-fn parse_instructions(program: Program, ins: Vector<u16>) -> Option<Program> {
+fn parse_instructions(program: Program, ins: RawProgram) -> Option<Program> {
 	parse_next_instruction(program, ins)
 		.and_then(|(next_program, next_ins)|
 			if next_ins.is_empty() {
@@ -111,9 +116,9 @@ fn parse_instructions(program: Program, ins: Vector<u16>) -> Option<Program> {
 	)
 }
 
-fn parse_next_instruction(program: Program, ins: Vector<u16>) -> Option<(Program, Vector<u16>)> {
+fn parse_next_instruction(program: Program, ins: RawProgram) -> Option<(Program, RawProgram)> {
 	match get_1(ins.clone()) {
-		Some((o, rest)) => {
+		Some((RawValue(o), rest)) => {
 			// println!("{:?}", o);
 			// println!("{:?}", rest);
 			match o {
@@ -284,103 +289,103 @@ fn run_operation(op: Op, regs: Registers, stack: Stack) -> Out {
 
 // set: 1 a b
 //   set register <a> to the value of <b>
-fn run_set(regs: Registers, stack: Stack, a: u16, b: u16) -> Out {
+fn run_set(regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
 // push: 2 a
 //   push <a> onto the stack
-fn run_push(regs: Registers, stack: Stack, a: u16) -> Out {
+fn run_push(regs: Registers, stack: Stack, a: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
 // pop: 3 a
 //   remove the top element from the stack and write it into <a>; empty stack = error
-fn run_pop(regs: Registers, stack: Stack, a: u16) -> Out {
+fn run_pop(regs: Registers, stack: Stack, a: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
 // eq: 4 a b c
 //   set <a> to 1 if <b> is equal to <c>; set it to 0 otherwise
-fn run_eq(regs: Registers, stack: Stack, a: u16, b: u16, c: u16) -> Out {
+fn run_eq(regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
 // gt: 5 a b c
 //   set <a> to 1 if <b> is greater than <c>; set it to 0 otherwise
-fn run_gt(regs: Registers, stack: Stack, a: u16, b: u16, c: u16) -> Out {
+fn run_gt(regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
 // jmp: 6 a
 //   jump to <a>
-fn run_jmp(regs: Registers, stack: Stack, a: u16) -> Out {
+fn run_jmp(regs: Registers, stack: Stack, a: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
 // jt: 7 a b
 //   if <a> is nonzero, jump to <b>
-fn run_jt(regs: Registers, stack: Stack, a: u16, b: u16) -> Out {
+fn run_jt(regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
 // jf: 8 a b
 //   if <a> is zero, jump to <b>
-fn run_jf(regs: Registers, stack: Stack, a: u16, b: u16) -> Out {
+fn run_jf(regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
 // add: 9 a b c
 //   assign into <a> the sum of <b> and <c> (modulo 32768)
-fn run_add(regs: Registers, stack: Stack, a: u16, b: u16, c: u16) -> Out {
+fn run_add(regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
 // mult: 10 a b c
 //   store into <a> the product of <b> and <c> (modulo 32768)
-fn run_mult(regs: Registers, stack: Stack, a: u16, b: u16, c: u16) -> Out {
+fn run_mult(regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
 // mod: 11 a b c
 //   store into <a> the remainder of <b> divided by <c>
-fn run_mod(regs: Registers, stack: Stack, a: u16, b: u16, c: u16) -> Out {
+fn run_mod(regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
 // and: 12 a b c
 //   stores into <a> the bitwise and of <b> and <c>
-fn run_and(regs: Registers, stack: Stack, a: u16, b: u16, c: u16) -> Out {
+fn run_and(regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
 // or: 13 a b c
 //   stores into <a> the bitwise or of <b> and <c>
-fn run_or(regs: Registers, stack: Stack, a: u16, b: u16, c: u16) -> Out {
+fn run_or(regs: Registers, stack: Stack, a: RawValue, b: RawValue, c: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
 // not: 14 a b
 //   stores 15-bit bitwise inverse of <b> in <a>
-fn run_not(regs: Registers, stack: Stack, a: u16, b: u16) -> Out {
+fn run_not(regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
 // rmem: 15 a b
 //   read memory at address <b> and write it to <a>
-fn run_rmem(regs: Registers, stack: Stack, a: u16, b: u16) -> Out {
+fn run_rmem(regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
 // wmem: 16 a b
 //   write the value from <b> into memory at address <a>
-fn run_wmem(regs: Registers, stack: Stack, a: u16, b: u16) -> Out {
+fn run_wmem(regs: Registers, stack: Stack, a: RawValue, b: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
 // call: 17 a
 //   write the address of the next instruction to the stack and jump to <a>
-fn run_call(regs: Registers, stack: Stack, a: u16) -> Out {
+fn run_call(regs: Registers, stack: Stack, a: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
@@ -391,12 +396,12 @@ fn run_ret(regs: Registers, stack: Stack) -> Out {
 }
 // out: 19 a
 //   write the character represented by ascii code <a> to the terminal
-fn run_out(regs: Registers, stack: Stack, a: u16) -> Out {
+fn run_out(regs: Registers, stack: Stack, a: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
 
 // in: 20 a
 //   read a character from the terminal and write its ascii code to <a>; it can be assumed that once input starts, it will continue until a newline is encountered; this means that you can safely read whole lines from the keyboard and trust that they will be fully read
-fn run_in(regs: Registers, stack: Stack, a: u16) -> Out {
+fn run_in(regs: Registers, stack: Stack, a: RawValue) -> Out {
 	Out::Continue(regs, stack)
 }
