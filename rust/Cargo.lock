@@ -1,4 +1,9 @@
 [[package]]
+name = "byteorder"
+version = "1.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "im"
 version = "10.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10,6 +15,7 @@ dependencies = [
 name = "machine"
 version = "0.1.0"
 dependencies = [
+ "byteorder 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "im 10.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ux 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -41,6 +47,7 @@ version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [metadata]
+"checksum byteorder 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "74c0b906e9446b0a2e4f760cdb3fa4b2c48cdc6db8766a845c54b6ff063fd2e9"
 "checksum im 10.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "006e5c34d6fc287f91a90f53f19a8a859bade826e3153b137b8e1022ea54250b"
 "checksum rustc_version 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "a54aa04a10c68c1c4eacb4337fd883b435997ede17a9385784b990777686b09a"
 "checksum semver 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1d7eb9ef2c18661902cc47e535f9bc51b78acd254da71d375c2f6720d9a40403"

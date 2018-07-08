@@ -4,5 +4,6 @@ version = "0.1.0"
 authors = ["Sebastian Porto <s@porto5.com>"]
 
 [dependencies]
+byteorder = "1.2.3"
 im = "10.2.0"
 ux = "0.1.2"

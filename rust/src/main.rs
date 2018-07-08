@@ -1,8 +1,13 @@
+extern crate byteorder;
 extern crate im;
 
 use im::Vector;
 use im::HashMap;
 use std::char;
+use std::fs::File;
+use std::io::Cursor;
+use std::io::Read;
+use byteorder::{LittleEndian, ReadBytesExt};
 
 const MODULO: u16 = 32768;
 
@@ -86,16 +91,33 @@ fn get_3(vec: RawProgram) -> Option<(RawValue, RawValue, RawValue, RawProgram)> 
 }
 
 fn main() {
-	let input = "9,32768,32769,4,19,32768";
+	let raw_program = read_bin()
+		.iter()
+		.map(|v| RawValue(*v) )
+		.collect();
 
-	let raw = parse_input(input);
+	// println!("{:?}", raw_program);
 
-	let result = parse_program(raw)
-		.map(|program|
+	let result = parse_program(raw_program)
+		.map(|program| {
+			println!("{:?}", program);
 			run_program(program)
-		).unwrap_or(Out::FailedToParse);
+		}).unwrap_or(Out::FailedToParse);
 
 	println!("{:?}", result);
+}
+
+fn read_bin() -> Vec<u16> {
+	let mut res = vec![0u16;0];
+
+	File::open("../challenge.bin")
+		.map(|mut file| 
+			while let Ok(v) = file.read_u16::<LittleEndian>() {
+				res.push(v);
+			}
+		);
+	
+	res
 }
 
 fn parse_input(input: &str) -> Vec<RawValue> {
@@ -128,7 +150,7 @@ fn parse_instructions(program: Program, ins: RawProgram) -> Option<Program> {
 fn parse_next_instruction(program: Program, ins: RawProgram) -> Option<(Program, RawProgram)> {
 	match get_1(ins.clone()) {
 		Some((RawValue(o), rest)) => {
-			// println!("{:?}", o);
+			println!("{:?}", o);
 			// println!("{:?}", rest);
 			match o {
 				0 => {
@@ -517,5 +539,5 @@ fn run_out(offset: usize, regs: Registers, stack: Stack, a: RawValue) -> Out {
 // in: 20 a
 //   read a character from the terminal and write its ascii code to <a>; it can be assumed that once input starts, it will continue until a newline is encountered; this means that you can safely read whole lines from the keyboard and trust that they will be fully read
 fn run_in(offset: usize, regs: Registers, stack: Stack, a: RawValue) -> Out {
-	Out::Continue(offset + 1, regs, stack)
+	set_value_in_register_and_continue(offset, regs, stack, a, Value(111))
 }
